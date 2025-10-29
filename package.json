@@ -1,6 +1,7 @@
 {
 	"name": "deepfunding-public-juror",
 	"version": "0.1.0",
+        "description": "Deep Funding Public Juror Data Collection App"
 	"private": true,
 	"scripts": {
 		"dev": "next dev --turbopack",
