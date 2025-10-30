@@ -1,36 +1,118 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Deep Funding Public Juror
+
+A Web3-enabled evaluation system for the Ethereum ecosystem, where qualified jurors evaluate and compare projects through multiple assessment interfaces. This system addresses systematic bias in value multiplier estimates by using targeted question types and contextualized comparisons.
+
+## Features
+
+- **Web3 Authentication**: Login with Ethereum wallets (MetaMask, WalletConnect, etc.) using SIWE (Sign-In with Ethereum) ✅
+- **Progressive Data Collection**: Multi-screen evaluation process with session persistence ✅
+- **Auto-save & Manual Submit**: Work is auto-saved to Cloudflare KV, submitted to Google Sheets on user action ✅
+- **Audit Trail**: Complete history in Google Sheets with superseded row marking ✅
+- **Edge Performance**: Global distribution with Cloudflare Workers Edge Runtime ✅
+- **Three-Tier Persistence**: Local State → KV (auto-save) → Google Sheets (submit) ✅
+
+## Architecture
+
+- **Frontend**: Next.js 15 with React 19, vanilla CSS
+- **Authentication**: Web3 wallet-based with cryptographic proof
+- **Storage**: 3-tier persistence (Local State → Cloudflare KV → Google Sheets)
+- **Deployment**: Cloudflare Pages with Edge Runtime optimization
+- **Mixed Runtime**: Node.js for auth routes, Edge Runtime for data operations
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- Ethereum wallet (MetaMask recommended)
+- Cloudflare account (for deployment)
+- Google Cloud account with Sheets API (for production)
+
+### Development
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+3. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+4. For Cloudflare-specific testing:
+   ```bash
+   npm run preview
+   ```
+
+### Environment Variables
+
+Create a `.env.local` file for development:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Session Management
+SESSION_SECRET=your-32-char-random-string
+
+# Google Sheets (production)
+GOOGLE_SERVICE_ACCOUNT_EMAIL=your-service-account@project.iam.gserviceaccount.com
+GOOGLE_SHEET_ID=your-google-sheet-id
+GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n..."
+
+# Optional
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your-walletconnect-project-id
+ENABLE_INVITE_CODES=true
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Deployment
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+Deploy to Cloudflare Pages:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm run deploy
+```
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── api/
+│   │   ├── siwe/           # Authentication routes (Node runtime)
+│   │   └── save-progress/  # Data routes (Edge runtime)
+│   ├── login/              # Login screen
+│   └── evaluation/         # Main evaluation screens
+├── components/             # Reusable UI components
+├── hooks/                  # Custom React hooks
+├── utils/                  # Utility functions
+└── lib/                    # Configuration and setup
+```
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
+- [Design Documents](./design/) - Complete system architecture and implementation guide
+- [CLAUDE.md](./CLAUDE.md) - AI assistant reference for this project
+- [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
+- [Cloudflare Pages](https://pages.cloudflare.com/) - Deployment platform documentation
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Implementation Status
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### ✅ Completed Infrastructure
+- **Web3 Authentication**: SIWE-based wallet login with session management
+- **Data Persistence**: Three-tier architecture (Local → KV → Google Sheets)
+- **API Layer**: Mixed runtime (Node.js for auth, Edge for data)
+- **Auto-save System**: 1-second debounced auto-save to Cloudflare KV
+- **Submission System**: Manual submit to Google Sheets with audit trail
+- **Progress Tracking**: User progress monitoring and recovery
 
-## Deploy on Vercel
+### 🚧 Next Steps
+- Design and implement evaluation screen interfaces
+- Create specific evaluation workflows (background, scale, comparison, etc.)
+- Add progress visualization and navigation
+- Implement screen validation and data schemas
+- Create admin interface for data analysis
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 🏗️ Ready for Development
+The core infrastructure is complete and ready for evaluation screen development. All data persistence, authentication, and submission systems are functional.

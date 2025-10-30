@@ -17,7 +17,17 @@
 	},
 	"observability": {
 		"enabled": true
-	}
+	},
+	/**
+	 * KV Namespaces for storing user data
+	 */
+	"kv_namespaces": [
+		{
+			"binding": "JURY_DATA",
+			"id": "bb994681332349a7b2178fe586e023f8",
+			"preview_id": "b79510138ca54452aee6b452ff9da6c3"
+		}
+	]
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
