@@ -7,20 +7,28 @@ import { sessionOptions } from '@/lib/session'
 import { SiweMessage } from 'siwe'
 
 export async function POST(req) {
-  const session = await getIronSession(cookies(), sessionOptions)
+  const cookieStore = await cookies()
+  const session = await getIronSession(cookieStore, sessionOptions)
   const { message, signature, inviteCode } = await req.json()
 
   try {
     const siwe = new SiweMessage(message)
     
     // Verify SIWE signature
-    const hostHeader = headers().get('host') || ''
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || `http://${hostHeader}`
-    const domain = new URL(appUrl).host
+    const headersList = await headers()
+    const hostHeader = headersList.get('host') || ''
+    
+    // Check for domain mismatch and clear session if needed (development only)
+    if (process.env.NODE_ENV === 'development' && siwe.domain !== hostHeader) {
+      console.log(`Domain mismatch detected: message=${siwe.domain}, server=${hostHeader}. Clearing session.`)
+      session.siweNonce = null
+      await session.save()
+      return NextResponse.json({ error: 'Domain mismatch. Please refresh and try again.' }, { status: 400 })
+    }
     
     const result = await siwe.verify({
       signature,
-      domain,
+      domain: hostHeader, // Use current server host
       nonce: session.siweNonce,
       time: new Date().toISOString(),
     })

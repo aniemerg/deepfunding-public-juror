@@ -1,81 +1,47 @@
-export const runtime = 'edge'
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-import { NextResponse } from 'next/server'
-import { KVStorageService } from '@/utils/kvStorage'
-
-export async function POST(request, { env }) {
-  try {
-    const { userAddress, dataType, id, data } = await request.json()
-
-    // Validate required fields
-    if (!userAddress || !dataType || !data) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      )
-    }
-
-    // Initialize KV service with environment
-    const kvService = new KVStorageService(env)
-
-    // Save based on data type
-    if (dataType === 'profile') {
-      await kvService.saveProfile(userAddress, data)
-    } else {
-      // For evaluation data, generate ID if not provided
-      const evaluationId = id || crypto.randomUUID()
-      await kvService.saveEvaluation(userAddress, dataType, evaluationId, data)
-      
-      return NextResponse.json({ 
-        success: true,
-        id: evaluationId,
-        message: 'Progress saved'
-      })
-    }
-
-    return NextResponse.json({ 
-      success: true,
-      message: 'Progress saved'
-    })
-  } catch (error) {
-    console.error('Save error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to save progress' },
-      { status: 500 }
-    )
-  }
+function key(user, dataType, id) {
+  return id ? `user:${user}:${dataType}:${id}` : `user:${user}:${dataType}`;
 }
 
-export async function GET(request, { env }) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const userAddress = searchParams.get('userAddress')
-    const dataType = searchParams.get('type')
-    const id = searchParams.get('id')
-
-    if (!userAddress) {
-      return NextResponse.json(
-        { error: 'User address required' },
-        { status: 400 }
-      )
-    }
-
-    const kvService = new KVStorageService(env)
-
-    // If specific type and id provided, get that specific item
-    if (dataType && id) {
-      const data = await kvService.getEvaluation(userAddress, dataType, id)
-      return NextResponse.json(data || {})
-    }
-
-    // Otherwise load all user data
-    const userData = await kvService.loadUserData(userAddress)
-    return NextResponse.json(userData)
-  } catch (error) {
-    console.error('Load error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to load data' },
-      { status: 500 }
-    )
+export async function POST(req) {
+  const body = await req.json();
+  if (!body?.user || !body?.dataType) {
+    return new Response(JSON.stringify({ ok: false, error: "invalid input" }), { status: 400 });
   }
+
+  const kv = getCloudflareContext().env.JURY_DATA;
+  const k = key(body.user, body.dataType, body.id);
+
+  await kv.put(k, JSON.stringify({
+    data: body.payload,
+    status: "draft",
+    updatedAt: new Date().toISOString(),
+  }));
+
+  // maintain _index per dataType
+  const idxKey = key(body.user, body.dataType, "_index");
+  const current = await kv.get(idxKey, { type: "json" });
+  const next = new Set(current ?? []);
+  if (body.id) next.add(body.id);
+  await kv.put(idxKey, JSON.stringify([...next]));
+
+  return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" }});
+}
+
+export async function GET(request) {
+  const { searchParams } = new URL(request.url)
+  const userAddress = searchParams.get('userAddress')
+  const dataType = searchParams.get('type')
+  const id = searchParams.get('id')
+
+  if (!userAddress) {
+    return new Response(JSON.stringify({ error: 'User address required' }), { status: 400 })
+  }
+
+  const kv = getCloudflareContext().env.JURY_DATA;
+  const k = key(userAddress, dataType || 'profile', id);
+  const data = await kv.get(k, { type: "json" });
+
+  return new Response(JSON.stringify(data || {}), { headers: { "content-type": "application/json" }});
 }

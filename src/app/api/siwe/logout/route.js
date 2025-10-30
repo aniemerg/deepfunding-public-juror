@@ -6,7 +6,8 @@ import { getIronSession } from 'iron-session'
 import { sessionOptions } from '@/lib/session'
 
 export async function POST() {
-  const session = await getIronSession(cookies(), sessionOptions)
+  const cookieStore = await cookies()
+  const session = await getIronSession(cookieStore, sessionOptions)
   
   // Clear session data
   session.user = null

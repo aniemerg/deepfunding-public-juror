@@ -7,7 +7,8 @@ import { sessionOptions } from '@/lib/session'
 import crypto from 'crypto'
 
 export async function GET() {
-  const session = await getIronSession(cookies(), sessionOptions)
+  const cookieStore = await cookies()
+  const session = await getIronSession(cookieStore, sessionOptions)
   const nonce = crypto.randomBytes(16).toString('hex')
   session.siweNonce = nonce
   await session.save()

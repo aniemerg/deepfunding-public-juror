@@ -10,10 +10,9 @@
 		"lint": "next lint",
 		"deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
 		"preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-		"cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts"
+		"cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
 	},
 	"dependencies": {
-		"@opennextjs/cloudflare": "^1.3.0",
 		"@rainbow-me/rainbowkit": "^2.2.9",
 		"@tanstack/react-query": "^5.90.5",
 		"iron-session": "^8.0.4",
@@ -25,7 +24,9 @@
 		"wagmi": "^2.19.1"
 	},
 	"devDependencies": {
+		"@cloudflare/next-on-pages": "^1.13.16",
 		"@eslint/eslintrc": "^3",
+		"@opennextjs/cloudflare": "^1.11.0",
 		"eslint": "^9",
 		"eslint-config-next": "15.4.6",
 		"wrangler": "^4.45.2"

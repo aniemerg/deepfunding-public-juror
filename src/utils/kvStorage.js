@@ -1,6 +1,35 @@
 export class KVStorageService {
   constructor(env) {
-    this.kv = env.JURY_DATA // KV namespace binding
+    this.kv = env?.JURY_DATA // KV namespace binding
+    
+    // Development fallback when KV is not available
+    if (!this.kv && typeof window === 'undefined') {
+      console.warn('⚠️  KV not available - using development localStorage fallback')
+      this.isDev = true
+    }
+  }
+
+  // Development storage using localStorage simulation
+  _getFromDev(key) {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem(`kv:${key}`)
+    }
+    // Server-side fallback - return null (data won't persist but won't crash)
+    return null
+  }
+
+  _setToDev(key, value) {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(`kv:${key}`, value)
+    }
+    // Server-side fallback - no-op
+  }
+
+  _deleteFromDev(key) {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(`kv:${key}`)
+    }
+    // Server-side fallback - no-op
   }
 
   // Generate consistent keys using Ethereum address
@@ -159,7 +188,7 @@ export class KVStorageService {
         comparison: {
           total: userData.comparison.length,
           submitted: userData.comparison.filter(d => d?.status === 'submitted').length,
-          draft: userData.comparison.filter(d => d?.status === 'draft').length
+          draft: userData.comparison.filter(d => d?.status === 'drift').length
         },
         originality: {
           total: userData.originality.length,

@@ -6,7 +6,8 @@ import { getIronSession } from 'iron-session'
 import { sessionOptions } from '@/lib/session'
 
 export async function GET() {
-  const session = await getIronSession(cookies(), sessionOptions)
+  const cookieStore = await cookies()
+  const session = await getIronSession(cookieStore, sessionOptions)
   
   return NextResponse.json({
     authenticated: !!session.user,

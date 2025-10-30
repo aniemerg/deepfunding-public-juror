@@ -1,11 +1,13 @@
 'use client'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import { BackgroundScreen } from '@/components/BackgroundScreen'
 
 export default function EvaluationPage() {
   const { user, isLoggedIn, isLoading, logout } = useAuth()
   const router = useRouter()
+  const [currentScreen, setCurrentScreen] = useState('background')
 
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
@@ -30,6 +32,35 @@ export default function EvaluationPage() {
     router.push('/')
   }
 
+  const handleNext = () => {
+    // For now, just show a success message
+    // Later this will navigate to the next screen
+    alert('Background information submitted successfully! Next screen will be implemented soon.')
+  }
+
+  const handleBack = () => {
+    router.push('/login')
+  }
+
+  const renderCurrentScreen = () => {
+    switch (currentScreen) {
+      case 'background':
+        return (
+          <BackgroundScreen 
+            onNext={handleNext}
+            onBack={handleBack}
+          />
+        )
+      default:
+        return (
+          <div style={styles.content}>
+            <h2>Screen not implemented yet</h2>
+            <p>Current screen: {currentScreen}</p>
+          </div>
+        )
+    }
+  }
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -44,15 +75,7 @@ export default function EvaluationPage() {
         </div>
       </div>
 
-      <div style={styles.content}>
-        <h2>Welcome to the Evaluation System</h2>
-        <p>
-          You are successfully authenticated with wallet address: <code>{user.address}</code>
-        </p>
-        <p>
-          The evaluation interface will be implemented here based on the design documents.
-        </p>
-      </div>
+      {renderCurrentScreen()}
     </div>
   )
 }
