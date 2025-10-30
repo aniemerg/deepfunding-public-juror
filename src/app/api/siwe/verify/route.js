@@ -5,6 +5,32 @@ import { NextResponse } from 'next/server'
 import { getIronSession } from 'iron-session'
 import { sessionOptions } from '@/lib/session'
 import { SiweMessage } from 'siwe'
+import { submitSessionData } from '@/lib/googleSheets'
+import { getCloudflareContext } from "@opennextjs/cloudflare"
+
+// ENS Resolution function
+async function resolveENSName(address) {
+  try {
+    console.log('Backend: Resolving ENS for address:', address);
+    
+    // Use the same API that works in frontend
+    const ensApiResponse = await fetch(`https://api.ensideas.com/ens/resolve/${address}`);
+    if (ensApiResponse.ok) {
+      const ensData = await ensApiResponse.json();
+      console.log('Backend: ENS API response:', ensData);
+      if (ensData.name && ensData.name.endsWith('.eth')) {
+        console.log('Backend: Found ENS via API:', ensData.name);
+        return ensData.name;
+      }
+    }
+    
+    console.log('Backend: No ENS found for address:', address);
+    return null;
+  } catch (error) {
+    console.error('Backend: ENS resolution failed:', error);
+    return null;
+  }
+}
 
 export async function POST(req) {
   const cookieStore = await cookies()
@@ -37,6 +63,15 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
 
+    // Resolve ENS name - REQUIRED for login
+    const ensName = await resolveENSName(siwe.address);
+    if (!ensName) {
+      return NextResponse.json({ 
+        error: 'ENS name required. This address must have an ENS name to participate.',
+        address: siwe.address 
+      }, { status: 403 })
+    }
+
     // Optional invite code validation
     if (process.env.ENABLE_INVITE_CODES === 'true' && !inviteCode) {
       return NextResponse.json({ error: 'Invite code required' }, { status: 401 })
@@ -45,6 +80,7 @@ export async function POST(req) {
     // Store user in session
     session.user = {
       address: siwe.address.toLowerCase(),
+      ensName: ensName,
       chainId: siwe.chainId,
       inviteCode: inviteCode || null,
     }
@@ -52,6 +88,19 @@ export async function POST(req) {
     // Clear the nonce to prevent replay
     session.siweNonce = null
     await session.save()
+
+    // Log session to Sessions sheet
+    try {
+      const env = getCloudflareContext().env;
+      await submitSessionData(env, {
+        ensName,
+        walletAddress: siwe.address.toLowerCase(),
+        inviteCode: inviteCode || null
+      });
+    } catch (sessionError) {
+      console.error('Failed to log session to Google Sheets:', sessionError);
+      // Don't fail login if session logging fails
+    }
 
     return NextResponse.json({ 
       success: true, 

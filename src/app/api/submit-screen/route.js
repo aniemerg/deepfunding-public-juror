@@ -1,31 +1,126 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { appendRowToSheet } from "@/lib/googleSheets";
+import { cookies } from 'next/headers';
+import { getIronSession } from 'iron-session';
+import { sessionOptions } from '@/lib/session';
+import { 
+  submitBackgroundData,
+  submitPersonalScaleData,
+  submitSimilarProjectData,
+  submitComparisonData,
+  submitOriginalityData
+} from "@/lib/googleSheets";
 
 export async function POST(req) {
-  const body = await req.json(); // { user, dataType, id, payload }
+  const body = await req.json(); // { user, dataType, id, payload, sessionId }
   const env = getCloudflareContext().env;
   const kv = env.JURY_DATA;
 
-  // append to Sheets
-  const row = [
-    new Date().toISOString(),
-    body.user,
-    body.dataType,
-    body.id ?? "",
-    "submitted",
-    JSON.stringify(body.payload),
-  ];
-  await appendRowToSheet(env, row);
+  try {
+    // Get ENS name from session
+    const cookieStore = await cookies();
+    const session = await getIronSession(cookieStore, sessionOptions);
+    
+    if (!session.user?.ensName) {
+      return new Response(JSON.stringify({ error: 'Not authenticated or missing ENS name' }), { status: 401 });
+    }
+    
+    const { user: walletAddress, dataType, id, payload } = body;
+    const ensName = session.user.ensName;
+    
+    switch (dataType) {
+      case 'background':
+        await submitBackgroundData(env, {
+          ensName,
+          backgroundText: payload.backgroundText,
+          wasSkipped: payload.wasSkipped || false
+        });
+        break;
+        
+      case 'personal-scale':
+        await submitPersonalScaleData(env, {
+          ensName,
+          mostValuableRepo: payload.mostValuableRepo,
+          leastValuableRepo: payload.leastValuableRepo,
+          scaleMultiplier: payload.scaleMultiplier,
+          reasoning: payload.reasoning
+        });
+        break;
+        
+      case 'similar-project':
+        // Parse screen number from id (e.g., "similar-1" -> 1)
+        const screenNumber = parseInt(id.split('-')[1]) || 1;
+        await submitSimilarProjectData(env, {
+          ensName,
+          screenNumber,
+          targetRepo: payload.targetRepo,
+          selectedRepo: payload.selectedRepo,
+          multiplier: payload.multiplier,
+          reasoning: payload.reasoning
+        });
+        break;
+        
+      case 'comparison':
+        // Parse comparison number from id (e.g., "comparison-3" -> 3)
+        const comparisonNumber = parseInt(id.split('-')[1]) || 1;
+        await submitComparisonData(env, {
+          ensName,
+          comparisonNumber,
+          repoA: payload.repoA,
+          repoB: payload.repoB,
+          winner: payload.chosenRepo || payload.winner,
+          loser: payload.otherRepo || payload.loser,
+          multiplier: payload.multiplier,
+          reasoning: payload.reasoning
+        });
+        break;
+        
+      case 'originality':
+        await submitOriginalityData(env, {
+          ensName,
+          targetRepo: payload.targetRepo,
+          originalityPercentage: payload.originalityPercentage,
+          reasoning: payload.reasoning
+        });
+        break;
+        
+      default:
+        // For unknown screen types, log an error but don't fail
+        console.error(`Unknown screen type: ${dataType}`);
+        // Skip Google Sheets submission for unknown types
+    }
 
-  // flip KV status to submitted for the same key
-  const k = body.id ? `user:${body.user}:${body.dataType}:${body.id}` : `user:${body.user}:${body.dataType}`;
-  await kv.put(k, JSON.stringify({
-    data: body.payload,
-    status: "submitted",
-    updatedAt: new Date().toISOString(),
-  }));
+    // Update KV status to submitted
+    const k = id ? `user:${walletAddress}:${dataType}:${id}` : `user:${walletAddress}:${dataType}`;
+    await kv.put(k, JSON.stringify({
+      data: payload,
+      status: "submitted",
+      updatedAt: new Date().toISOString(),
+      sessionId: actualSessionId
+    }));
 
-  return new Response(JSON.stringify({ ok: true }), { headers: { "content-type": "application/json" }});
+    return new Response(JSON.stringify({ 
+      ok: true, 
+      submittedTo: dataType === 'background' || dataType === 'personal-scale' || dataType === 'similar-project' || dataType === 'comparison' || dataType === 'originality' ? 'google-sheets' : 'kv-only'
+    }), { headers: { "content-type": "application/json" }});
+    
+  } catch (error) {
+    console.error('Submit screen error:', error);
+    
+    // Still save to KV even if Google Sheets fails
+    const k = body.id ? `user:${body.user}:${body.dataType}:${body.id}` : `user:${body.user}:${body.dataType}`;
+    await kv.put(k, JSON.stringify({
+      data: body.payload,
+      status: "submitted",
+      updatedAt: new Date().toISOString(),
+      error: error.message
+    }));
+    
+    return new Response(JSON.stringify({ 
+      ok: true, 
+      warning: 'Saved to KV but Google Sheets submission failed',
+      error: error.message 
+    }), { headers: { "content-type": "application/json" }});
+  }
 }
 
 // Get submission status for a screen

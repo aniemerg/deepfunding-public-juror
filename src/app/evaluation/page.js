@@ -67,7 +67,7 @@ export default function EvaluationPage() {
         <h1 style={styles.title}>Deep Funding Public Juror</h1>
         <div style={styles.userInfo}>
           <span style={styles.address}>
-            Connected: {user.address.substring(0, 6)}...{user.address.substring(38)}
+            {user.ensName}
           </span>
           <button onClick={handleLogout} style={styles.logoutButton}>
             Logout

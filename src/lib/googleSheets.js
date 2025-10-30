@@ -1,4 +1,5 @@
-export async function appendRowToSheet(env, values) {
+// Generate JWT token for Google Sheets API
+async function getAccessToken(env) {
   const now = Math.floor(Date.now() / 1000);
   const header = { alg: "RS256", typ: "JWT" };
   const iss = env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
@@ -10,10 +11,31 @@ export async function appendRowToSheet(env, values) {
     .replace(/=+$/,'').replace(/\+/g,'-').replace(/\//g,'_');
 
   const unsigned = `${enc(header)}.${enc(payload)}`;
-  const pkcs8 = `-----BEGIN PRIVATE KEY-----\n${env.GOOGLE_PRIVATE_KEY}\n-----END PRIVATE KEY-----`;
+  
+  // Handle private key - need to extract the base64 content and decode it
+  let privateKey = env.GOOGLE_PRIVATE_KEY;
+  
+  // Replace escaped newlines with actual newlines
+  privateKey = privateKey.replace(/\\n/g, '\n');
+  
+  // Extract the base64 content between the headers
+  const pemHeader = '-----BEGIN PRIVATE KEY-----';
+  const pemFooter = '-----END PRIVATE KEY-----';
+  
+  // Remove headers if present
+  if (privateKey.includes(pemHeader)) {
+    privateKey = privateKey
+      .replace(pemHeader, '')
+      .replace(pemFooter, '')
+      .replace(/\n/g, ''); // Remove all newlines to get pure base64
+  }
+  
+  // Decode the base64 private key to binary
+  const binaryKey = Uint8Array.from(atob(privateKey), c => c.charCodeAt(0));
+    
   const key = await crypto.subtle.importKey(
     "pkcs8",
-    new TextEncoder().encode(pkcs8),
+    binaryKey,
     { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
     false,
     ["sign"]
@@ -27,12 +49,210 @@ export async function appendRowToSheet(env, values) {
     body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: jwt }),
   }).then(r => r.json());
 
+  if (!tokenRes.access_token) {
+    throw new Error(`Auth failed: ${JSON.stringify(tokenRes)}`);
+  }
+
+  return tokenRes.access_token;
+}
+
+// Generate unique submission ID
+function generateSubmissionId() {
+  return crypto.randomUUID();
+}
+
+// Mark previous submissions as not latest
+async function markPreviousSubmissionsOld(env, accessToken, sheetName, walletAddress, screenType = null) {
   const sheetId = env.GOOGLE_SHEET_ID;
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
+  
+  // Get all data from the sheet
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}`;
+  const res = await fetch(url, {
+    headers: { "authorization": `Bearer ${accessToken}` }
+  });
+  
+  if (!res.ok) return; // Sheet might not exist yet
+  
+  const data = await res.json();
+  if (!data.values || data.values.length <= 1) return; // No data or just headers
+  
+  const rows = data.values;
+  const headers = rows[0];
+  
+  // Find column indices
+  const walletCol = headers.indexOf('wallet_address');
+  const isLatestCol = headers.indexOf('is_latest');
+  const screenCol = screenType ? headers.indexOf('screen_number') : -1;
+  
+  if (walletCol === -1 || isLatestCol === -1) return;
+  
+  // Find rows to update
+  const updates = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (row[walletCol] === walletAddress && row[isLatestCol] === 'TRUE') {
+      // For screens with screen_number (like similar projects), only mark same screen type
+      if (screenType && screenCol !== -1 && row[screenCol] !== screenType.toString()) {
+        continue;
+      }
+      
+      updates.push({
+        range: `${sheetName}!${String.fromCharCode(65 + isLatestCol)}${i + 1}`,
+        values: [['FALSE']]
+      });
+    }
+  }
+  
+  // Batch update if we have changes
+  if (updates.length > 0) {
+    await fetch(`https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values:batchUpdate`, {
+      method: "POST",
+      headers: { "authorization": `Bearer ${accessToken}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        valueInputOption: "RAW",
+        data: updates
+      })
+    });
+  }
+}
+
+// Submit background screen data
+export async function submitBackgroundData(env, { ensName, backgroundText, wasSkipped }) {
+  const accessToken = await getAccessToken(env);
+  const submissionId = generateSubmissionId();
+  const sheetName = "Background";
+  
+  const values = [
+    submissionId,
+    1, // version
+    ensName,
+    new Date().toISOString(),
+    wasSkipped.toString(),
+    backgroundText || ''
+  ];
+  
+  return await appendToSheet(env, accessToken, sheetName, values);
+}
+
+// Submit personal scale data
+export async function submitPersonalScaleData(env, { ensName, mostValuableRepo, leastValuableRepo, scaleMultiplier, reasoning }) {
+  const accessToken = await getAccessToken(env);
+  const submissionId = generateSubmissionId();
+  const sheetName = "PersonalScale";
+  
+  const values = [
+    submissionId,
+    1, // version
+    ensName,
+    new Date().toISOString(),
+    mostValuableRepo,
+    leastValuableRepo,
+    scaleMultiplier.toString(),
+    reasoning || ''
+  ];
+  
+  return await appendToSheet(env, accessToken, sheetName, values);
+}
+
+// Submit similar project data
+export async function submitSimilarProjectData(env, { ensName, screenNumber, targetRepo, selectedRepo, multiplier, reasoning }) {
+  const accessToken = await getAccessToken(env);
+  const submissionId = generateSubmissionId();
+  const sheetName = "SimilarProjects";
+  
+  const values = [
+    submissionId,
+    1, // version
+    ensName,
+    new Date().toISOString(),
+    screenNumber.toString(),
+    targetRepo,
+    selectedRepo,
+    multiplier ? multiplier.toString() : '',
+    reasoning || ''
+  ];
+  
+  return await appendToSheet(env, accessToken, sheetName, values);
+}
+
+// Submit comparison data
+export async function submitComparisonData(env, { ensName, comparisonNumber, repoA, repoB, winner, loser, multiplier, reasoning }) {
+  const accessToken = await getAccessToken(env);
+  const submissionId = generateSubmissionId();
+  const sheetName = "Comparisons";
+  
+  const values = [
+    submissionId,
+    1, // version
+    ensName,
+    new Date().toISOString(),
+    comparisonNumber.toString(),
+    repoA,
+    repoB,
+    winner,
+    loser,
+    multiplier.toString(),
+    reasoning || ''
+  ];
+  
+  return await appendToSheet(env, accessToken, sheetName, values);
+}
+
+// Submit originality data
+export async function submitOriginalityData(env, { ensName, targetRepo, originalityPercentage, reasoning }) {
+  const accessToken = await getAccessToken(env);
+  const submissionId = generateSubmissionId();
+  const sheetName = "Originality";
+  
+  const values = [
+    submissionId,
+    1, // version
+    ensName,
+    new Date().toISOString(),
+    targetRepo,
+    originalityPercentage.toString(),
+    reasoning || ''
+  ];
+  
+  return await appendToSheet(env, accessToken, sheetName, values);
+}
+
+// Generic append function
+async function appendToSheet(env, accessToken, sheetName, values) {
+  const sheetId = env.GOOGLE_SHEET_ID;
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}!A:A:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
+  
   const res = await fetch(url, {
     method: "POST",
-    headers: { "authorization": `Bearer ${tokenRes.access_token}`, "content-type": "application/json" },
+    headers: { "authorization": `Bearer ${accessToken}`, "content-type": "application/json" },
     body: JSON.stringify({ values: [values] }),
   });
-  if (!res.ok) throw new Error(`Sheets append failed: ${res.status} ${await res.text()}`);
+  
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Sheets append failed: ${res.status} ${errorText}`);
+  }
+  
+  return await res.json();
+}
+
+// Submit session data (login tracking)
+export async function submitSessionData(env, { ensName, walletAddress, inviteCode }) {
+  const accessToken = await getAccessToken(env);
+  const sheetName = "Sessions";
+  
+  const values = [
+    ensName,
+    walletAddress.toLowerCase(),
+    inviteCode || '',
+    new Date().toISOString()
+  ];
+  
+  return await appendToSheet(env, accessToken, sheetName, values);
+}
+
+// Legacy function for backward compatibility - now routes to appropriate function
+export async function appendRowToSheet(env, values) {
+  // This is the old function - we'll need to update submit-screen API to use the new functions
+  throw new Error("appendRowToSheet is deprecated. Use specific submit functions.");
 }
