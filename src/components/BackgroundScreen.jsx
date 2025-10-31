@@ -62,7 +62,8 @@ export function BackgroundScreen({ onNext, onBack }) {
   }
 
   const handleSkip = () => {
-    if (window.confirm('Are you sure? Providing background information helps validate your expertise and increases the weight given to your comparisons.')) {
+    // If already submitted, allow skip without confirmation
+    if (lastSubmittedAt || window.confirm('Are you sure? Providing background information helps validate your expertise and increases the weight given to your comparisons.')) {
       setWasSkipped(true)
       setBackgroundText('')
       handleSubmit()

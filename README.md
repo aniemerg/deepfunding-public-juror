@@ -5,26 +5,32 @@ A Web3-enabled evaluation system for the Ethereum ecosystem, where qualified jur
 ## Features
 
 - **Web3 Authentication**: Login with Ethereum wallets (MetaMask, WalletConnect, etc.) using SIWE (Sign-In with Ethereum) ✅
+- **ENS Name Requirement**: Users must have ENS names ending in .eth to participate ✅  
 - **Progressive Data Collection**: Multi-screen evaluation process with session persistence ✅
 - **Auto-save & Manual Submit**: Work is auto-saved to Cloudflare KV, submitted to Google Sheets on user action ✅
-- **Audit Trail**: Complete history in Google Sheets with superseded row marking ✅
-- **Edge Performance**: Global distribution with Cloudflare Workers Edge Runtime ✅
+- **Human-Readable Data**: Structured Google Sheets format for data team analysis (no JSON blobs) ✅
+- **Audit Trail**: Complete history in Google Sheets with append-only architecture ✅
+- **Edge Performance**: Global distribution with Cloudflare Workers ✅
 - **Three-Tier Persistence**: Local State → KV (auto-save) → Google Sheets (submit) ✅
 
 ## Architecture
 
 - **Frontend**: Next.js 15 with React 19, vanilla CSS
-- **Authentication**: Web3 wallet-based with cryptographic proof
+- **Authentication**: Web3 wallet-based with ENS requirement and cryptographic proof  
 - **Storage**: 3-tier persistence (Local State → Cloudflare KV → Google Sheets)
-- **Deployment**: Cloudflare Pages with Edge Runtime optimization
-- **Mixed Runtime**: Node.js for auth routes, Edge Runtime for data operations
+- **Data Format**: Human-readable structured sheets, ENS names as primary identifiers
+- **Deployment**: Cloudflare Pages with OpenNext adapter
+- **Runtime**: Node.js compatibility mode for universal KV access
+
+📊 **Data Structure**: See [`design/GOOGLE_SHEETS_STRUCTURE.md`](./design/GOOGLE_SHEETS_STRUCTURE.md)  
+📊 **Project Dataset**: See [`design/elo.csv`](./design/elo.csv) - 98 Ethereum projects with ELO rankings
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+
-- Ethereum wallet (MetaMask recommended)
+- Ethereum wallet with ENS name ending in .eth (MetaMask recommended)
 - Cloudflare account (for deployment)
 - Google Cloud account with Sheets API (for production)
 
@@ -35,17 +41,17 @@ A Web3-enabled evaluation system for the Ethereum ecosystem, where qualified jur
    npm install
    ```
 
-2. Start the development server:
+2. **Primary Development** (with KV access):
    ```bash
-   npm run dev
+   npm run preview  # OpenNext with production parity
    ```
+   Open [http://localhost:8787](http://localhost:8787)
 
-3. Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-4. For Cloudflare-specific testing:
+3. **Alternative Development** (UI iteration only):
    ```bash
-   npm run preview
+   npm run dev      # Next.js dev server (KV won't work)
    ```
+   Open [http://localhost:3001](http://localhost:3001)
 
 ### Environment Variables
 
@@ -67,11 +73,11 @@ ENABLE_INVITE_CODES=true
 
 ### Deployment
 
-Deploy to Cloudflare Pages:
+Deploy to Cloudflare Pages with OpenNext:
 
 ```bash
-npm run build
-npm run deploy
+npm run build    # OpenNext build
+npm run deploy   # Deploy to Cloudflare Pages
 ```
 
 ## Project Structure
@@ -81,18 +87,29 @@ src/
 ├── app/
 │   ├── api/
 │   │   ├── siwe/           # Authentication routes (Node runtime)
-│   │   └── save-progress/  # Data routes (Edge runtime)
-│   ├── login/              # Login screen
+│   │   └── */              # Data routes (Node-compat runtime)
+│   ├── login/              # Login screen with ENS requirement
 │   └── evaluation/         # Main evaluation screens
 ├── components/             # Reusable UI components
-├── hooks/                  # Custom React hooks
-├── utils/                  # Utility functions
-└── lib/                    # Configuration and setup
+├── hooks/                  # Custom React hooks (useAuth, useAutoSave)
+├── lib/                    # Configuration and Google Sheets integration
+└── design/
+    ├── GOOGLE_SHEETS_STRUCTURE.md  # 📊 Complete data schema
+    ├── elo.csv                     # 📊 98 Ethereum projects with ELO rankings
+    ├── ELO_DATASET.md             # 📊 Dataset documentation and analysis
+    ├── PATHFINDER_EXAMPLES.md     # 📋 Interface examples and patterns
+    ├── ComparisonFeedbackInterface/ # 📋 Advanced comparison example
+    ├── RangeDefinitionInterface/   # 📋 Personal scale definition example
+    └── SimilarProjectsInterface/   # 📋 Value clustering example
 ```
 
 ## Learn More
 
-- [Design Documents](./design/) - Complete system architecture and implementation guide
+- **📊 [Google Sheets Data Structure](./design/GOOGLE_SHEETS_STRUCTURE.md)** - Complete schema reference
+- **📊 [Project Dataset](./design/elo.csv)** - 98 Ethereum projects with ELO rankings and weights
+- **📊 [Dataset Documentation](./design/ELO_DATASET.md)** - Dataset analysis and usage guide
+- **📋 [Pathfinder Interface Examples](./design/PATHFINDER_EXAMPLES.md)** - Reference implementations for evaluation screens
+- [Design Documents](./design/) - Complete system architecture and implementation guide  
 - [CLAUDE.md](./CLAUDE.md) - AI assistant reference for this project
 - [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
 - [Cloudflare Pages](https://pages.cloudflare.com/) - Deployment platform documentation
@@ -100,11 +117,15 @@ src/
 ## Implementation Status
 
 ### ✅ Completed Infrastructure
-- **Web3 Authentication**: SIWE-based wallet login with session management
+- **Web3 Authentication**: SIWE-based wallet login with ENS requirement and session management
+- **ENS Integration**: Real-time ENS detection, requirement enforcement, primary identifier system
 - **Data Persistence**: Three-tier architecture (Local → KV → Google Sheets)
-- **API Layer**: Mixed runtime (Node.js for auth, Edge for data)
+- **Human-Readable Data**: Structured Google Sheets with named tabs, no JSON blobs
+- **Session Tracking**: Automatic login logging with ENS+address mapping to Sessions sheet
+- **Clean UI**: ENS names displayed to users, addresses tracked in backend
+- **API Layer**: Node.js compatibility runtime with universal KV access
 - **Auto-save System**: 1-second debounced auto-save to Cloudflare KV
-- **Submission System**: Manual submit to Google Sheets with audit trail
+- **Submission System**: Manual submit to Google Sheets with append-only audit trail
 - **Progress Tracking**: User progress monitoring and recovery
 
 ### 🚧 Next Steps

@@ -36,41 +36,43 @@ export async function POST(req) {
         });
         break;
         
-      case 'personal-scale':
+      case 'personal_scale':
         await submitPersonalScaleData(env, {
           ensName,
-          mostValuableRepo: payload.mostValuableRepo,
-          leastValuableRepo: payload.leastValuableRepo,
+          mostValuableRepo: payload.mostValuableProject,
+          leastValuableRepo: payload.leastValuableProject,
           scaleMultiplier: payload.scaleMultiplier,
-          reasoning: payload.reasoning
+          reasoning: payload.reasoning || ''
         });
         break;
         
-      case 'similar-project':
+      case 'similar_projects':
         // Parse screen number from id (e.g., "similar-1" -> 1)
         const screenNumber = parseInt(id.split('-')[1]) || 1;
         await submitSimilarProjectData(env, {
           ensName,
           screenNumber,
-          targetRepo: payload.targetRepo,
-          selectedRepo: payload.selectedRepo,
-          multiplier: payload.multiplier,
-          reasoning: payload.reasoning
+          targetRepo: payload.targetProject,
+          selectedRepo: payload.similarProject,
+          multiplier: payload.similarMultiplier,
+          reasoning: payload.reasoning || ''
         });
         break;
         
       case 'comparison':
         // Parse comparison number from id (e.g., "comparison-3" -> 3)
         const comparisonNumber = parseInt(id.split('-')[1]) || 1;
+        const winner = payload.winner;
+        const loser = winner === payload.projectA ? payload.projectB : payload.projectA;
         await submitComparisonData(env, {
           ensName,
           comparisonNumber,
-          repoA: payload.repoA,
-          repoB: payload.repoB,
-          winner: payload.chosenRepo || payload.winner,
-          loser: payload.otherRepo || payload.loser,
+          repoA: payload.projectA,
+          repoB: payload.projectB,
+          winner: winner,
+          loser: loser,
           multiplier: payload.multiplier,
-          reasoning: payload.reasoning
+          reasoning: payload.reasoning || ''
         });
         break;
         
@@ -95,12 +97,12 @@ export async function POST(req) {
       data: payload,
       status: "submitted",
       updatedAt: new Date().toISOString(),
-      sessionId: actualSessionId
+      sessionId: session.user?.address || 'unknown'
     }));
 
     return new Response(JSON.stringify({ 
       ok: true, 
-      submittedTo: dataType === 'background' || dataType === 'personal-scale' || dataType === 'similar-project' || dataType === 'comparison' || dataType === 'originality' ? 'google-sheets' : 'kv-only'
+      submittedTo: dataType === 'background' || dataType === 'personal_scale' || dataType === 'similar_projects' || dataType === 'comparison' || dataType === 'originality' ? 'google-sheets' : 'kv-only'
     }), { headers: { "content-type": "application/json" }});
     
   } catch (error) {
