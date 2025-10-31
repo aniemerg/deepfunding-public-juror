@@ -65,7 +65,40 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
   const plan = planData ? JSON.parse(planData) : null
   
   if (!plan) {
-    return getInitialNavigationState()
+    // Return a stub plan with just background and range_definition
+    // Check completion status for these screens
+    const backgroundCompleted = await kv.get(`user:${userAddress}:completed:background`)
+    const rangeCompleted = await kv.get(`user:${userAddress}:completed:range_definition`)
+    
+    const navigationItems = [
+      {
+        id: 'background',
+        screenType: 'background',
+        text: 'Background',
+        status: backgroundCompleted ? 'completed' : 'current'
+      },
+      {
+        id: 'range_definition',
+        screenType: 'range_definition',
+        text: 'Personal Scale',
+        status: rangeCompleted ? 'completed' : (backgroundCompleted ? 'current' : 'pending')
+      }
+    ]
+    
+    // Determine current screen
+    let currentScreen = 'background'
+    if (backgroundCompleted && !rangeCompleted) {
+      currentScreen = 'range_definition'
+    } else if (rangeCompleted) {
+      // Both completed but no plan yet - stay on range_definition
+      currentScreen = 'range_definition'
+    }
+    
+    return {
+      navigationItems,
+      currentScreen,
+      plan: null
+    }
   }
   
   // Load completion status for all possible screens
@@ -107,6 +140,28 @@ function getInitialNavigationState() {
     ],
     currentScreen: 'background',
     plan: null
+  }
+}
+
+function getInitialNavigationStateWithStub() {
+  // Check if background is completed to determine current screen
+  return {
+    navigationItems: [
+      {
+        id: 'background',
+        screenType: 'background',
+        text: 'Background',
+        status: 'pending'  // Will be updated based on completion status
+      },
+      {
+        id: 'range_definition',
+        screenType: 'range_definition', 
+        text: 'Personal Scale',
+        status: 'pending'
+      }
+    ],
+    currentScreen: 'background', // Will be updated based on completion status
+    plan: null  // Stub - full plan will be generated after range_definition
   }
 }
 
@@ -191,10 +246,39 @@ async function handleCompleteScreen(userAddress, screenId, data, kv) {
     data: data
   }))
   
-  // 2. Submit to Google Sheets (write-only)
-  await submitToGoogleSheets(userAddress, screenId, data)
+  // 2. If completing range_definition and no plan exists, generate the full plan
+  if (screenId === 'range_definition') {
+    const existingPlan = await kv.get(`user:${userAddress}:evaluation-plan`)
+    if (!existingPlan) {
+      const { getRandomProject, getRandomPair, getDiversePair } = await import('@/lib/eloDataset')
+      
+      // Generate evaluation plan: 2 similar projects, 10 comparisons
+      const similarProjects = [
+        getRandomProject(),
+        getRandomProject()
+      ]
+      
+      const comparisons = []
+      for (let i = 0; i < 10; i++) {
+        const pair = i % 2 === 0 ? getRandomPair() : getDiversePair()
+        comparisons.push(pair)
+      }
+      
+      const plan = {
+        similarProjects,
+        comparisons,
+        planGenerated: new Date().toISOString(),
+        userAddress
+      }
+      
+      // Save the generated plan
+      await kv.put(`user:${userAddress}:evaluation-plan`, JSON.stringify(plan))
+      console.log('Generated full evaluation plan after range_definition for user:', userAddress)
+    }
+  }
   
-  // 3. Derive new navigation state FIRST
+  // 3. Derive new navigation state
+  // Note: Google Sheets submission is handled by each screen component directly
   const newState = await deriveNavigationStateFromKV(userAddress, kv)
   
   // 4. THEN update cache atomically
@@ -238,90 +322,6 @@ async function handleNavigateToScreen(userAddress, screenId, kv) {
   return Response.json(newState)
 }
 
-async function submitToGoogleSheets(userAddress, screenId, data) {
-  try {
-    // Import the individual sheet submission functions
-    const { 
-      submitBackgroundData,
-      submitPersonalScaleData,
-      submitSimilarProjectData,
-      submitComparisonData,
-      submitOriginalityData
-    } = await import('@/lib/googleSheets')
-    
-    const { cookies } = await import('next/headers')
-    const { getIronSession } = await import('iron-session')
-    const { sessionOptions } = await import('@/lib/session')
-    
-    // Get ENS name from session
-    const cookieStore = await cookies()
-    const session = await getIronSession(cookieStore, sessionOptions)
-    
-    if (!session.user?.ensName) {
-      throw new Error('Not authenticated or missing ENS name')
-    }
-    
-    const ensName = session.user.ensName
-    const env = getCloudflareContext().env
-    const screenType = getScreenTypeFromId(screenId)
-    
-    // Route to appropriate submission function based on screen type
-    switch (screenType) {
-      case 'background':
-        await submitBackgroundData(env, {
-          ensName,
-          backgroundText: data.backgroundText,
-          wasSkipped: data.wasSkipped || false
-        })
-        break
-        
-      case 'personal_scale':
-        await submitPersonalScaleData(env, {
-          ensName,
-          mostValuableRepo: data.mostValuableProject,
-          leastValuableRepo: data.leastValuableProject,
-          scaleMultiplier: data.scaleMultiplier,
-          reasoning: data.reasoning || ''
-        })
-        break
-        
-      case 'similar_projects':
-        const screenNumber = parseInt(screenId.split('_')[2]) || 1
-        await submitSimilarProjectData(env, {
-          ensName,
-          screenNumber,
-          targetRepo: data.targetProject,
-          selectedRepo: data.similarProject,
-          multiplier: data.similarMultiplier,
-          reasoning: data.reasoning || ''
-        })
-        break
-        
-      case 'comparison':
-        const comparisonNumber = parseInt(screenId.split('_')[1]) || 1
-        const winner = data.winner
-        const loser = winner === data.projectA ? data.projectB : data.projectA
-        await submitComparisonData(env, {
-          ensName,
-          comparisonNumber,
-          repoA: data.projectA,
-          repoB: data.projectB,
-          winner: winner,
-          loser: loser,
-          multiplier: data.multiplier,
-          reasoning: data.reasoning || ''
-        })
-        break
-        
-      default:
-        console.log(`Unknown screen type for Google Sheets: ${screenType}`)
-        // Skip Google Sheets submission for unknown types
-    }
-  } catch (error) {
-    console.error('Error submitting to Google Sheets:', error)
-    // Don't fail the whole operation if sheets submission fails
-  }
-}
 
 function getScreenTypeFromId(screenId) {
   if (screenId === 'background') return 'background'

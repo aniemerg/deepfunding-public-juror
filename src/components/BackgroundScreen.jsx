@@ -21,6 +21,7 @@ export function BackgroundScreen({ onNext, onBack }) {
   }
 
   useAutosave(data, { user: user?.address, dataType: screenType, id: screenId })
+  const { submitScreen, getSubmissionStatus } = useDataSubmission()
 
   useEffect(() => {
     if (user?.address) {
@@ -30,15 +31,11 @@ export function BackgroundScreen({ onNext, onBack }) {
 
   const loadExistingData = async () => {
     try {
-      // Load from KV using the same pattern as other screens
-      const response = await fetch(`/api/get-saved-data?userAddress=${user.address}&dataType=${screenType}&id=${screenId}`)
-      if (response.ok) {
-        const savedData = await response.json()
-        if (savedData) {
-          setBackgroundText(savedData.backgroundText || '')
-          setWasSkipped(savedData.wasSkipped || false)
-          setLastSubmittedAt(savedData.backgroundTimestamp)
-        }
+      const submission = await getSubmissionStatus(user.address, screenType, screenId)
+      if (submission.exists && submission.data) {
+        setBackgroundText(submission.data.backgroundText || '')
+        setWasSkipped(submission.data.wasSkipped || false)
+        setLastSubmittedAt(submission.data.backgroundTimestamp)
       }
     } catch (error) {
       console.error('Failed to load existing data:', error)
@@ -50,10 +47,14 @@ export function BackgroundScreen({ onNext, onBack }) {
     setError(null)
 
     try {
-      // Call parent's onNext handler with the screen data
+      // Submit to Google Sheets first
+      await submitScreen(user.address, screenType, screenId, data)
+      
+      // Then handle navigation
       if (onNext) {
         await onNext(data)
       }
+      
       setLastSubmittedAt(new Date().toISOString())
     } catch (error) {
       // Use debug endpoint for logging since console.log doesn't work
