@@ -11,7 +11,7 @@ import {
   getFundingPercentage 
 } from '@/lib/eloDataset'
 
-export function SimilarProjectsScreen({ onNext, onBack, onProjectChange }) {
+export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onNext, onBack, onProjectChange }) {
   const { user } = useAuth()
   const [targetProject, setTargetProject] = useState(null)
   const [selectedProject, setSelectedProject] = useState('')
@@ -20,7 +20,6 @@ export function SimilarProjectsScreen({ onNext, onBack, onProjectChange }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastSubmittedAt, setLastSubmittedAt] = useState(null)
   const [error, setError] = useState(null)
-  const [completedComparisons, setCompletedComparisons] = useState([])
 
   const screenType = 'similar_projects'
   const screenId = `similar-${targetProject?.repo || 'pending'}`
@@ -36,10 +35,28 @@ export function SimilarProjectsScreen({ onNext, onBack, onProjectChange }) {
 
   const projects = getAllProjects()
 
-  // Initialize with a random project
+  // Initialize with planned project or random if not provided
   useEffect(() => {
-    selectNewTarget()
-  }, [])
+    if (plannedTargetProject) {
+      setTargetProject(plannedTargetProject)
+      const similar = getSimilarProjects(plannedTargetProject.repo, 2.0, 3)
+      setSuggestions(similar)
+      
+      // Notify parent of project change for navigation
+      if (onProjectChange) {
+        onProjectChange({ targetProject: plannedTargetProject.repo })
+      }
+    } else {
+      selectNewTarget()
+    }
+  }, [plannedTargetProject])
+
+  // Update navigation text when target project changes
+  useEffect(() => {
+    if (targetProject && onProjectChange) {
+      onProjectChange({ targetProject: targetProject.repo })
+    }
+  }, [targetProject, onProjectChange])
 
   // Load existing data when user or target changes
   useEffect(() => {
@@ -105,19 +122,10 @@ export function SimilarProjectsScreen({ onNext, onBack, onProjectChange }) {
         setLastSubmittedAt(null)
       }, 3000)
       
-      // Track this comparison
-      const newCompletedComparisons = [...completedComparisons, targetProject.repo]
-      setCompletedComparisons(newCompletedComparisons)
-      
-      // After brief success display, get a new project
+      // After brief success display, move to next screen
       setTimeout(() => {
-        if (newCompletedComparisons.length >= 2) {
-          // After 2 comparisons, move to next screen
-          if (onNext) {
-            onNext()
-          }
-        } else {
-          selectNewTarget()
+        if (onNext) {
+          onNext()
         }
         setIsSubmitting(false) // Reset submitting state after navigation
       }, 1500)
@@ -149,8 +157,6 @@ export function SimilarProjectsScreen({ onNext, onBack, onProjectChange }) {
     return <div>Loading...</div>
   }
 
-  const progress = completedComparisons.length + 1
-
   return (
     <div className="similar-projects-screen">
       <div className="content-container">
@@ -159,9 +165,6 @@ export function SimilarProjectsScreen({ onNext, onBack, onProjectChange }) {
           <p className="subtitle">
             Identify projects of similar value to establish value clusters
           </p>
-          <div className="progress-indicator">
-            Comparison {progress} of 2
-          </div>
         </header>
 
         <div className="target-section">

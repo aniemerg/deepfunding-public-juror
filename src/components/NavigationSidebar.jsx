@@ -140,8 +140,8 @@ export function NavigationSidebar({
           return (
             <button
               key={item.id}
-              className={`nav-item ${item.status} ${item.screenId === currentScreen ? 'active' : ''}`}
-              onClick={() => clickable && onNavigate(item.screenId)}
+              className={`nav-item ${item.status} ${item.id === currentScreen ? 'active' : ''}`}
+              onClick={() => clickable && onNavigate(item.screenType)}
               disabled={!clickable}
               style={{
                 color: getStatusColor(item),

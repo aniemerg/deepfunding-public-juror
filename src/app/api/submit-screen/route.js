@@ -100,6 +100,19 @@ export async function POST(req) {
       sessionId: session.user?.address || 'unknown'
     }));
 
+    // NEW: Mark as completed in navigation state tracking
+    const screenId = getScreenIdFromDataType(dataType, id, payload);
+    if (screenId) {
+      await kv.put(`user:${walletAddress}:completed:${screenId}`, JSON.stringify({
+        completed: true,
+        timestamp: new Date().toISOString(),
+        data: payload
+      }));
+      
+      // Clear navigation cache so it will be re-derived
+      await kv.delete(`user:${walletAddress}:navigation-state`);
+    }
+
     return new Response(JSON.stringify({ 
       ok: true, 
       submittedTo: dataType === 'background' || dataType === 'personal_scale' || dataType === 'similar_projects' || dataType === 'comparison' || dataType === 'originality' ? 'google-sheets' : 'kv-only'
@@ -122,6 +135,26 @@ export async function POST(req) {
       warning: 'Saved to KV but Google Sheets submission failed',
       error: error.message 
     }), { headers: { "content-type": "application/json" }});
+  }
+}
+
+// Helper function to convert dataType and id to screenId for navigation state
+function getScreenIdFromDataType(dataType, id, payload) {
+  switch (dataType) {
+    case 'background':
+      return 'background'
+    case 'personal_scale':
+      return 'range_definition'
+    case 'similar_projects':
+      // Parse screen number from id (e.g., "similar-1" -> "similar_projects_1")
+      const screenNumber = parseInt(id.split('-')[1]) || 1;
+      return `similar_projects_${screenNumber}`
+    case 'comparison':
+      // Parse comparison number from id (e.g., "comparison-3" -> "comparison_3")
+      const comparisonNumber = parseInt(id.split('-')[1]) || 1;
+      return `comparison_${comparisonNumber}`
+    default:
+      return null
   }
 }
 

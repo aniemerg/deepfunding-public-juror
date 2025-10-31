@@ -9,6 +9,8 @@ export async function GET() {
   const cookieStore = await cookies()
   const session = await getIronSession(cookieStore, sessionOptions)
   
+  console.log('SIWE Status: Session data:', session.user)
+  
   return NextResponse.json({
     authenticated: !!session.user,
     user: session.user || null

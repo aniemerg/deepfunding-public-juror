@@ -1,133 +1,24 @@
 'use client'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { BackgroundScreen } from '@/components/BackgroundScreen'
 import { RangeDefinitionScreen } from '@/components/RangeDefinitionScreen'
 import { SimilarProjectsScreen } from '@/components/SimilarProjectsScreen'
 import { ComparisonScreen } from '@/components/ComparisonScreen'
 import { NavigationSidebar } from '@/components/NavigationSidebar'
-import { useUserData } from '@/hooks/useAutoSave'
+import { useServerNavigationState } from '@/hooks/useServerNavigationState'
 
 export default function EvaluationPage() {
   const { user, isLoggedIn, isLoading, logout } = useAuth()
   const router = useRouter()
-  const [currentScreen, setCurrentScreen] = useState('background')
-  const [navigationItems, setNavigationItems] = useState([
-    {
-      id: 'background',
-      screenId: 'background',
-      text: 'Background',
-      status: 'current'
-    }
-  ])
-  const [screenData, setScreenData] = useState({}) // Store data for revisiting screens
-  const [isRestoringProgress, setIsRestoringProgress] = useState(false)
-  const { loadProgress } = useUserData(user?.address)
+  
+  // Debug logging - try multiple possible address fields
+  const userAddress = user?.address || user?.ensName || user?.walletAddress
+  console.log('EvaluationPage: Auth state:', { user, isLoggedIn, isLoading, userAddress })
+  
+  const { state: navigationState, loading: navigationLoading, error: navigationError, completeScreen, navigateToScreen } = useServerNavigationState(userAddress)
 
-  // Restore navigation progress from user's previous sessions
-  const restoreNavigationProgress = useCallback(async () => {
-    setIsRestoringProgress(true)
-    
-    try {
-      const progress = await loadProgress()
-      if (!progress?.screens) {
-        setIsRestoringProgress(false)
-        return
-      }
-
-      const { background, scale, similar, comparison } = progress.screens
-      const restoredItems = []
-      let nextScreen = 'background'
-
-      // Always add background
-      restoredItems.push({
-        id: 'background',
-        screenId: 'background',
-        text: 'Background',
-        status: background.submitted > 0 ? 'completed' : 'current'
-      })
-
-      if (background.submitted > 0) {
-        nextScreen = 'range_definition'
-        
-        // Add range definition
-        restoredItems.push({
-          id: 'range_definition',
-          screenId: 'range_definition',
-          text: 'Range Definition',
-          status: scale.submitted > 0 ? 'completed' : 'current'
-        })
-
-        if (scale.submitted > 0) {
-          nextScreen = 'similar_projects_1'
-          
-          // Add similar projects (up to 2)
-          for (let i = 1; i <= Math.min(similar.submitted, 2); i++) {
-            restoredItems.push({
-              id: `similar_projects_${i}`,
-              screenId: 'similar_projects',
-              text: `Similar: Loading...`, // Will be updated when screen loads
-              status: 'completed'
-            })
-          }
-
-          // If we have fewer than 2 similar projects, add the next one as current
-          if (similar.submitted < 2) {
-            const nextSimilarNum = similar.submitted + 1
-            restoredItems.push({
-              id: `similar_projects_${nextSimilarNum}`,
-              screenId: 'similar_projects',
-              text: `Similar: Loading...`,
-              status: 'current'
-            })
-            nextScreen = `similar_projects_${nextSimilarNum}`
-          } else {
-            nextScreen = 'comparison_1'
-            
-            // Add comparison screens (up to 10)
-            for (let i = 1; i <= Math.min(comparison.submitted, 10); i++) {
-              restoredItems.push({
-                id: `comparison_${i}`,
-                screenId: 'comparison',
-                text: `Comparison: Loading...`, // Will be updated when screen loads
-                status: 'completed'
-              })
-            }
-
-            // If we have fewer than 10 comparisons, add the next one as current
-            if (comparison.submitted < 10) {
-              const nextCompNum = comparison.submitted + 1
-              restoredItems.push({
-                id: `comparison_${nextCompNum}`,
-                screenId: 'comparison',
-                text: `Comparison: Loading...`,
-                status: 'current'
-              })
-              nextScreen = `comparison_${nextCompNum}`
-            } else {
-              // All comparisons done - would go to completion
-              nextScreen = 'completion'
-              restoredItems.push({
-                id: 'completion',
-                screenId: 'completion',
-                text: 'Complete',
-                status: 'current'
-              })
-            }
-          }
-        }
-      }
-
-      setNavigationItems(restoredItems)
-      setCurrentScreen(nextScreen)
-      
-    } catch (error) {
-      console.error('Failed to restore navigation progress:', error)
-    } finally {
-      setIsRestoringProgress(false)
-    }
-  }, [loadProgress])
 
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
@@ -135,18 +26,11 @@ export default function EvaluationPage() {
     }
   }, [isLoading, isLoggedIn, router])
 
-  // Restore navigation progress when user is authenticated
-  useEffect(() => {
-    if (isLoggedIn && user?.address && !isRestoringProgress) {
-      restoreNavigationProgress()
-    }
-  }, [isLoggedIn, user?.address, isRestoringProgress, restoreNavigationProgress])
-
-  if (isLoading || isRestoringProgress) {
+  if (isLoading || navigationLoading) {
     return (
       <div style={styles.container}>
         <div style={styles.loading}>
-          {isLoading ? 'Loading...' : 'Restoring progress...'}
+          {isLoading ? 'Loading...' : 'Loading navigation...'}
         </div>
       </div>
     )
@@ -156,172 +40,93 @@ export default function EvaluationPage() {
     return null // Will redirect in useEffect
   }
 
+  if (navigationError) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.loading}>
+          Error loading navigation: {navigationError}
+          <br />
+          <button onClick={() => window.location.reload()} style={styles.logoutButton}>
+            Reload Page
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!navigationState) {
+    return (
+      <div style={styles.container}>
+        <div style={styles.loading}>
+          Initializing navigation...
+          <br />
+          <button onClick={async () => {
+            const response = await fetch('/api/siwe/status', { credentials: 'include' })
+            const data = await response.json()
+            alert('Auth Status: ' + JSON.stringify(data, null, 2))
+          }} style={styles.logoutButton}>
+            Debug Auth Status
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const handleLogout = async () => {
     await logout()
     router.push('/')
   }
 
-  // Add a new navigation item when needed
-  const addNavigationItem = (itemData) => {
-    setNavigationItems(prev => {
-      const exists = prev.find(item => item.id === itemData.id)
-      if (exists) return prev
-      
-      return [...prev, { ...itemData, status: 'current' }]
-    })
-  }
-
-  // Update navigation item status
-  const updateNavigationItem = (id, updates) => {
-    setNavigationItems(prev => 
-      prev.map(item => 
-        item.id === id ? { ...item, ...updates } : item
-      )
-    )
-  }
-
-  // Handle project change from screens to update navigation text
-  const handleProjectChange = (data) => {
-    const currentNavItem = navigationItems.find(item => item.status === 'current')
-    if (currentNavItem) {
-      let newText = currentNavItem.text
-      
-      if (data.targetProject && currentNavItem.id.startsWith('similar_projects')) {
-        newText = `Similar: ${data.targetProject}`
-      } else if (data.projectA && data.projectB && currentNavItem.id.startsWith('comparison')) {
-        newText = `Comparison: ${data.projectA} vs ${data.projectB}`
-      }
-      
-      updateNavigationItem(currentNavItem.id, { text: newText })
-    }
-  }
-
-  // Mark current item as completed and set new current
-  const handleNext = (nextScreenData = null) => {
-    // Mark current screen as completed
-    updateNavigationItem(currentScreen, { status: 'completed' })
-    
-    // Determine next screen based on current screen
-    let nextScreen = null
-    let nextNavItem = null
-    
-    switch (currentScreen) {
-      case 'background':
-        nextScreen = 'range_definition'
-        nextNavItem = {
-          id: 'range_definition',
-          screenId: 'range_definition', 
-          text: 'Range Definition',
-          status: 'current'
-        }
-        break
-      case 'range_definition':
-        // Add first similar project screen
-        nextScreen = 'similar_projects_1'
-        nextNavItem = {
-          id: 'similar_projects_1',
-          screenId: 'similar_projects',
-          text: `Similar: ${nextScreenData?.targetProject || 'Loading...'}`,
-          status: 'current'
-        }
-        break
-      case 'similar_projects':
-        // Check if this was the first or second similar project
-        const similarCount = navigationItems.filter(item => item.id.startsWith('similar_projects')).length
-        if (similarCount < 2) {
-          nextScreen = 'similar_projects_2'
-          nextNavItem = {
-            id: 'similar_projects_2',
-            screenId: 'similar_projects',
-            text: `Similar: ${nextScreenData?.targetProject || 'Loading...'}`,
-            status: 'current'
-          }
-        } else {
-          // Move to first comparison
-          nextScreen = 'comparison_1'
-          nextNavItem = {
-            id: 'comparison_1',
-            screenId: 'comparison',
-            text: `Comparison: ${nextScreenData?.projectA || 'Loading...'} vs ${nextScreenData?.projectB || 'Loading...'}`,
-            status: 'current'
-          }
-        }
-        break
-      case 'comparison':
-        // Check how many comparisons we've done
-        const comparisonCount = navigationItems.filter(item => item.id.startsWith('comparison')).length
-        if (comparisonCount < 10) {
-          const nextCompNum = comparisonCount + 1
-          nextScreen = `comparison_${nextCompNum}`
-          nextNavItem = {
-            id: `comparison_${nextCompNum}`,
-            screenId: 'comparison',
-            text: `Comparison: ${nextScreenData?.projectA || 'Loading...'} vs ${nextScreenData?.projectB || 'Loading...'}`,
-            status: 'current'
-          }
-        } else {
-          // Move to completion
-          nextScreen = 'completion'
-          nextNavItem = {
-            id: 'completion',
-            screenId: 'completion',
-            text: 'Complete',
-            status: 'current'
-          }
-        }
-        break
-    }
-    
-    if (nextScreen && nextNavItem) {
-      addNavigationItem(nextNavItem)
-      setCurrentScreen(nextScreen)
+  // Handle screen completion - data comes from the screen component
+  const handleNext = async (screenData = {}) => {
+    try {
+      await completeScreen(navigationState.currentScreen, screenData)
+    } catch (error) {
+      // Use debug endpoint for logging since console.log doesn't work
+      fetch('/api/debug', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'handleNext error in evaluation page',
+          data: { error: error.message, currentScreen: navigationState.currentScreen, screenData }
+        })
+      }).catch(() => {})
     }
   }
 
   const handleBack = () => {
-    const navIndex = navigationItems.findIndex(item => item.screenId === currentScreen && item.status === 'current')
-    if (navIndex > 0) {
-      // Go to previous navigation item
-      const prevItem = navigationItems[navIndex - 1]
-      updateNavigationItem(currentScreen, { status: 'pending' })
-      updateNavigationItem(prevItem.id, { status: 'current' })
-      setCurrentScreen(prevItem.screenId)
+    const currentIndex = navigationState.navigationItems.findIndex(item => item.id === navigationState.currentScreen)
+    if (currentIndex > 0) {
+      const prevItem = navigationState.navigationItems[currentIndex - 1]
+      navigateToScreen(prevItem.id)
     } else {
       router.push('/login')
     }
   }
 
-  const handleNavigateToScreen = (screenId) => {
-    // Find the navigation item for this screen
-    const navItem = navigationItems.find(item => item.screenId === screenId && item.status !== 'pending')
-    if (navItem) {
-      // Update current status
-      const currentNavItem = navigationItems.find(item => item.status === 'current')
-      if (currentNavItem) {
-        updateNavigationItem(currentNavItem.id, { status: 'completed' })
-      }
-      updateNavigationItem(navItem.id, { status: 'current' })
-      setCurrentScreen(navItem.screenId)
+  const handleNavigateToScreen = async (screenId) => {
+    try {
+      await navigateToScreen(screenId)
+    } catch (error) {
+      console.error('Failed to navigate to screen:', error)
+      // Could show error toast here
     }
   }
 
-  // Get current screen's navigation ID for tracking
-  const getCurrentScreenId = () => {
-    const currentNavItem = navigationItems.find(item => item.status === 'current')
-    return currentNavItem?.screenId || currentScreen
-  }
 
-  // Get the base screen type for rendering (strips the instance number)
-  const getBaseScreenType = () => {
-    if (currentScreen.startsWith('similar_projects')) return 'similar_projects'
-    if (currentScreen.startsWith('comparison')) return 'comparison'
-    return currentScreen
-  }
 
   const renderCurrentScreen = () => {
-    const baseScreenId = getBaseScreenType()
+    const currentNavItem = navigationState.navigationItems.find(item => item.id === navigationState.currentScreen)
+    if (!currentNavItem) {
+      return (
+        <div style={styles.content}>
+          <h2>Screen not found</h2>
+          <p>Current screen: {navigationState.currentScreen}</p>
+        </div>
+      )
+    }
     
-    switch (baseScreenId) {
+    switch (currentNavItem.screenType) {
       case 'background':
         return (
           <BackgroundScreen 
@@ -339,17 +144,19 @@ export default function EvaluationPage() {
       case 'similar_projects':
         return (
           <SimilarProjectsScreen
-            onNext={(data) => handleNext(data)}
+            key={navigationState.currentScreen}
+            targetProject={currentNavItem.data?.targetProject}
+            onNext={handleNext}
             onBack={handleBack}
-            onProjectChange={handleProjectChange}
           />
         )
       case 'comparison':
         return (
           <ComparisonScreen
-            onNext={(data) => handleNext(data)}
+            key={navigationState.currentScreen}
+            projectPair={currentNavItem.data?.projectPair}
+            onNext={handleNext}
             onBack={handleBack}
-            onProjectChange={handleProjectChange}
           />
         )
       case 'completion':
@@ -371,8 +178,8 @@ export default function EvaluationPage() {
       default:
         return (
           <div style={styles.content}>
-            <h2>Screen not implemented yet</h2>
-            <p>Current screen: {currentScreen}</p>
+            <h2>Unknown screen type</h2>
+            <p>Type: {currentNavItem.screenType}</p>
           </div>
         )
     }
@@ -394,8 +201,8 @@ export default function EvaluationPage() {
 
       <div style={styles.bodyContainer}>
         <NavigationSidebar 
-          navigationItems={navigationItems}
-          currentScreen={getCurrentScreenId()}
+          navigationItems={navigationState.navigationItems}
+          currentScreen={navigationState.currentScreen}
           onNavigate={handleNavigateToScreen}
         />
         
@@ -430,8 +237,8 @@ const styles = {
   },
   mainContent: {
     flex: 1,
-    marginLeft: '280px', // Account for fixed sidebar width
     overflow: 'auto',
+    padding: '20px',
   },
   title: {
     fontSize: '24px',

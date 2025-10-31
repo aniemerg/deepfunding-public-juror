@@ -1,25 +1,47 @@
 import { useAccount, useSignMessage } from 'wagmi'
 import { createSiweMessage } from 'viem/siwe'
 import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 
 export function useAuth() {
   const { address, chainId, isConnected } = useAccount()
   const { signMessageAsync } = useSignMessage()
+  const pathname = usePathname()
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Check authentication status on mount
+  // Check authentication status on mount and route changes
   useEffect(() => {
     checkAuthStatus()
-  }, [])
+  }, [pathname]) // Re-check when navigating between pages
+
+  // Removed polling - too noisy
 
   const checkAuthStatus = async () => {
     try {
       const response = await fetch('/api/siwe/status', { credentials: 'include' })
       const data = await response.json()
+      
+      // Use debug endpoint to log to server console
+      fetch('/api/debug', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'useAuth checkAuthStatus result',
+          data: { response: data, authenticated: data.authenticated, user: data.user }
+        })
+      }).catch(() => {})
+      
       setUser(data.authenticated ? data.user : null)
     } catch (error) {
-      console.error('Error checking auth status:', error)
+      fetch('/api/debug', {
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'useAuth checkAuthStatus ERROR',
+          data: { error: error.message }
+        })
+      }).catch(() => {})
       setUser(null)
     } finally {
       setIsLoading(false)

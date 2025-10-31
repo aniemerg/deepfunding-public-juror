@@ -21,7 +21,6 @@ export function BackgroundScreen({ onNext, onBack }) {
   }
 
   useAutosave(data, { user: user?.address, dataType: screenType, id: screenId })
-  const { submitScreen, getSubmissionStatus } = useDataSubmission()
 
   useEffect(() => {
     if (user?.address) {
@@ -31,11 +30,15 @@ export function BackgroundScreen({ onNext, onBack }) {
 
   const loadExistingData = async () => {
     try {
-      const submission = await getSubmissionStatus(user.address, screenType, screenId)
-      if (submission.exists && submission.data) {
-        setBackgroundText(submission.data.backgroundText || '')
-        setWasSkipped(submission.data.wasSkipped || false)
-        setLastSubmittedAt(submission.data.backgroundTimestamp)
+      // Load from KV using the same pattern as other screens
+      const response = await fetch(`/api/get-saved-data?userAddress=${user.address}&dataType=${screenType}&id=${screenId}`)
+      if (response.ok) {
+        const savedData = await response.json()
+        if (savedData) {
+          setBackgroundText(savedData.backgroundText || '')
+          setWasSkipped(savedData.wasSkipped || false)
+          setLastSubmittedAt(savedData.backgroundTimestamp)
+        }
       }
     } catch (error) {
       console.error('Failed to load existing data:', error)
@@ -47,14 +50,22 @@ export function BackgroundScreen({ onNext, onBack }) {
     setError(null)
 
     try {
-      const result = await submitScreen(user.address, screenType, screenId, data)
-      setLastSubmittedAt(new Date().toISOString())
-      
+      // Call parent's onNext handler with the screen data
       if (onNext) {
-        onNext()
+        await onNext(data)
       }
+      setLastSubmittedAt(new Date().toISOString())
     } catch (error) {
-      console.error('Submission failed:', error)
+      // Use debug endpoint for logging since console.log doesn't work
+      fetch('/api/debug', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'BackgroundScreen handleSubmit error',
+          data: { error: error.message, stack: error.stack }
+        })
+      }).catch(() => {})
+      
       setError('Failed to submit background information. Please try again.')
     } finally {
       setIsSubmitting(false)
