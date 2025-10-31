@@ -10,7 +10,7 @@ import {
   formatRepoName
 } from '@/lib/eloDataset'
 
-export function ComparisonScreen({ onNext, onBack, onProjectChange }) {
+export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBack, onProjectChange }) {
   const { user } = useAuth()
   const [projectA, setProjectA] = useState(null)
   const [projectB, setProjectB] = useState(null)
@@ -19,7 +19,6 @@ export function ComparisonScreen({ onNext, onBack, onProjectChange }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastSubmittedAt, setLastSubmittedAt] = useState(null)
   const [error, setError] = useState(null)
-  const [completedComparisons, setCompletedComparisons] = useState([])
   const [showWeights, setShowWeights] = useState(false)
 
   const screenType = 'comparison'
@@ -37,10 +36,37 @@ export function ComparisonScreen({ onNext, onBack, onProjectChange }) {
   useAutosave(data, { user: user?.address, dataType: screenType, id: screenId })
   const { submitScreen, getSubmissionStatus } = useDataSubmission()
 
-  // Initialize with a random pair
+  // Initialize with planned pair or random if not provided
   useEffect(() => {
-    loadNewComparison()
-  }, [])
+    if (plannedProjectPair) {
+      setProjectA(plannedProjectPair[0])
+      setProjectB(plannedProjectPair[1])
+      setSelectedWinner('')
+      setMultiplier('')
+      setError(null)
+      setShowWeights(false)
+      
+      // Notify parent of project change for navigation
+      if (onProjectChange) {
+        onProjectChange({ 
+          projectA: plannedProjectPair[0].repo, 
+          projectB: plannedProjectPair[1].repo 
+        })
+      }
+    } else {
+      loadNewComparison()
+    }
+  }, [plannedProjectPair])
+
+  // Update navigation text when projects change
+  useEffect(() => {
+    if (projectA && projectB && onProjectChange) {
+      onProjectChange({ 
+        projectA: projectA.repo, 
+        projectB: projectB.repo 
+      })
+    }
+  }, [projectA, projectB, onProjectChange])
 
   // Load existing data when user or projects change
   useEffect(() => {
@@ -50,8 +76,8 @@ export function ComparisonScreen({ onNext, onBack, onProjectChange }) {
   }, [user?.address, projectA, projectB])
 
   const loadNewComparison = () => {
-    // Alternate between random and diverse pairs for variety
-    const pair = completedComparisons.length % 2 === 0 ? getRandomPair() : getDiversePair()
+    // Get a random pair
+    const pair = getRandomPair()
     setProjectA(pair[0])
     setProjectB(pair[1])
     setSelectedWinner('')
@@ -116,19 +142,10 @@ export function ComparisonScreen({ onNext, onBack, onProjectChange }) {
         setLastSubmittedAt(null)
       }, 3000)
       
-      // Track this comparison
-      const newCompleted = [...completedComparisons, comparisonId]
-      setCompletedComparisons(newCompleted)
-      
-      // After brief success display, get a new comparison
+      // After brief success display, move to next screen
       setTimeout(() => {
-        if (newCompleted.length >= 10) {
-          // After 10 comparisons, move to next screen
-          if (onNext) {
-            onNext()
-          }
-        } else {
-          loadNewComparison()
+        if (onNext) {
+          onNext()
         }
         setIsSubmitting(false) // Reset submitting state after navigation
       }, 1500)
@@ -143,7 +160,6 @@ export function ComparisonScreen({ onNext, onBack, onProjectChange }) {
     return <div>Loading...</div>
   }
 
-  const progress = completedComparisons.length + 1
   const weightA = parseFloat(getFundingPercentage(projectA.repo))
   const weightB = parseFloat(getFundingPercentage(projectB.repo))
   const expectedRatio = weightA / weightB
@@ -156,9 +172,6 @@ export function ComparisonScreen({ onNext, onBack, onProjectChange }) {
           <p className="subtitle">
             Compare two projects and indicate their relative value
           </p>
-          <div className="progress-indicator">
-            Comparison {progress} of 10
-          </div>
         </header>
 
         <div className="comparison-section">

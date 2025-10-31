@@ -11,7 +11,7 @@ export async function GET(request) {
   const kv = getCloudflareContext().env.JURY_DATA;
   
   // Get progress for different screen types
-  const types = ['background', 'scale', 'similar', 'comparison', 'originality'];
+  const types = ['background', 'personal_scale', 'similar_projects', 'comparison', 'originality'];
   const progress = {};
   
   for (const type of types) {

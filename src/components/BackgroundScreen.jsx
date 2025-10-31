@@ -47,14 +47,26 @@ export function BackgroundScreen({ onNext, onBack }) {
     setError(null)
 
     try {
-      const result = await submitScreen(user.address, screenType, screenId, data)
-      setLastSubmittedAt(new Date().toISOString())
+      // Submit to Google Sheets first
+      await submitScreen(user.address, screenType, screenId, data)
       
+      // Then handle navigation
       if (onNext) {
-        onNext()
+        await onNext(data)
       }
+      
+      setLastSubmittedAt(new Date().toISOString())
     } catch (error) {
-      console.error('Submission failed:', error)
+      // Use debug endpoint for logging since console.log doesn't work
+      fetch('/api/debug', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'BackgroundScreen handleSubmit error',
+          data: { error: error.message, stack: error.stack }
+        })
+      }).catch(() => {})
+      
       setError('Failed to submit background information. Please try again.')
     } finally {
       setIsSubmitting(false)
