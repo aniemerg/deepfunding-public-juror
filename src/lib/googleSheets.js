@@ -1,3 +1,25 @@
+// Get the correct Google Sheet ID based on environment
+function getSheetId(env) {
+  const cloudflareEnv = env.CLOUDFLARE_ENV || 'preview'; // Default to preview for safety
+
+  const sheetIdKey = cloudflareEnv === 'production'
+    ? 'GOOGLE_SHEET_ID_PRODUCTION'
+    : 'GOOGLE_SHEET_ID_PREVIEW';
+
+  const sheetId = env[sheetIdKey];
+
+  if (!sheetId) {
+    throw new Error(
+      `Missing Google Sheet ID for environment "${cloudflareEnv}". ` +
+      `Expected env var: ${sheetIdKey}. ` +
+      `Set CLOUDFLARE_ENV=preview or production and configure the corresponding sheet ID.`
+    );
+  }
+
+  console.log(`Using Google Sheet for ${cloudflareEnv} environment: ${sheetId.slice(0, 10)}...`);
+  return sheetId;
+}
+
 // Generate JWT token for Google Sheets API
 async function getAccessToken(env) {
   const now = Math.floor(Date.now() / 1000);
@@ -63,7 +85,7 @@ function generateSubmissionId() {
 
 // Mark previous submissions as not latest
 async function markPreviousSubmissionsOld(env, accessToken, sheetName, walletAddress, screenType = null) {
-  const sheetId = env.GOOGLE_SHEET_ID;
+  const sheetId = getSheetId(env);
   
   // Get all data from the sheet
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}`;
@@ -219,7 +241,7 @@ export async function submitOriginalityData(env, { ensName, targetRepo, original
 
 // Generic append function
 async function appendToSheet(env, accessToken, sheetName, values) {
-  const sheetId = env.GOOGLE_SHEET_ID;
+  const sheetId = getSheetId(env);
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}!A:A:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
   
   const res = await fetch(url, {
