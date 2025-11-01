@@ -84,10 +84,26 @@ export async function POST(req) {
       chainId: siwe.chainId,
       inviteCode: inviteCode || null,
     }
-    
+
     // Clear the nonce to prevent replay
     session.siweNonce = null
     await session.save()
+
+    // Store ENS name in KV for easy access (e.g., by kv-manager tool)
+    try {
+      const env = getCloudflareContext().env;
+      const profileKey = `user:${siwe.address.toLowerCase()}:profile`;
+      await env.JURY_DATA.put(profileKey, JSON.stringify({
+        ensName: ensName,
+        address: siwe.address.toLowerCase(),
+        chainId: siwe.chainId,
+        firstLogin: new Date().toISOString(),
+        lastLogin: new Date().toISOString()
+      }));
+    } catch (kvError) {
+      console.error('Failed to store profile in KV:', kvError);
+      // Don't fail login if KV storage fails
+    }
 
     // Log session to Sessions sheet
     try {
