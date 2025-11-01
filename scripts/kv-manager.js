@@ -20,8 +20,8 @@ const readline = require('readline');
 
 // KV namespace IDs from wrangler.jsonc
 const KV_NAMESPACES = {
-  preview: 'b79510138ca54452aee6b452ff9da6c3',
-  production: 'bb994681332349a7b2178fe586e023f8'
+  preview: '221e8a16f90a4ae8bf4025f471d4c31c',
+  production: 'd5dc344ae45b41b88f0f0ae11cefa8ba'
 };
 
 // Colors for terminal output
