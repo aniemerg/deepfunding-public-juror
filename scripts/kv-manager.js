@@ -106,14 +106,21 @@ function getUserProfile(address, env = 'preview') {
   }
 }
 
-// Resolve ENS name to address - check KV first, then assume it's an address
+// Resolve ENS name to address - check reverse mapping first for speed
 function resolveENS(ensNameOrAddress, env = 'preview') {
   // If it looks like an address, return it
   if (ensNameOrAddress.startsWith('0x')) {
     return ensNameOrAddress.toLowerCase();
   }
 
-  // Otherwise, search KV for this ENS name
+  // Try fast lookup via reverse mapping (ens:{name} → address)
+  const ensLookupKey = `ens:${ensNameOrAddress}`;
+  const ensMapping = getKeyValue(ensLookupKey, env);
+  if (ensMapping && ensMapping.address) {
+    return ensMapping.address.toLowerCase();
+  }
+
+  // Fallback: scan all profiles (for backwards compatibility with old data)
   const allKeys = getAllKeys(env);
   const profileKeys = allKeys.filter(k => k.includes(':profile'));
 

@@ -93,12 +93,21 @@ export async function POST(req) {
     try {
       const env = getCloudflareContext().env;
       const profileKey = `user:${siwe.address.toLowerCase()}:profile`;
+      const ensLookupKey = `ens:${ensName}`;
+
+      // Store user profile (address → profile data)
       await env.JURY_DATA.put(profileKey, JSON.stringify({
         ensName: ensName,
         address: siwe.address.toLowerCase(),
         chainId: siwe.chainId,
         firstLogin: new Date().toISOString(),
         lastLogin: new Date().toISOString()
+      }));
+
+      // Store reverse mapping (ENS name → address)
+      await env.JURY_DATA.put(ensLookupKey, JSON.stringify({
+        address: siwe.address.toLowerCase(),
+        updatedAt: new Date().toISOString()
       }));
     } catch (kvError) {
       console.error('Failed to store profile in KV:', kvError);
