@@ -6,7 +6,7 @@ import { useAutosave, useDataSubmission } from '@/hooks/useAutoSave'
 
 export function OriginalityScreen({ targetProject, onNext, onBack, onForward, isCompleted }) {
   const { user } = useAuth()
-  const [originality, setOriginality] = useState(50)
+  const [originality, setOriginality] = useState(80)
   const [reasoning, setReasoning] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastSubmittedAt, setLastSubmittedAt] = useState(null)
@@ -65,9 +65,9 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
   }
 
   const handleInputBlur = () => {
-    // If empty or invalid on blur, reset to 50
+    // If empty or invalid on blur, reset to 80
     if (originality === '' || isNaN(originality)) {
-      setOriginality(50)
+      setOriginality(80)
     }
   }
 
@@ -128,7 +128,14 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
 
         <div className="assessment-section">
           <div className="project-info">
-            <div className="project-name">{targetProject.repo}</div>
+            <a
+              href={`https://github.com/${targetProject.repo}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="project-name"
+            >
+              {targetProject.repo}
+            </a>
           </div>
 
           <div className="task-description">
@@ -292,6 +299,14 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
           font-size: 1.5rem;
           font-weight: 600;
           color: #0c4a6e;
+          text-decoration: none;
+          transition: color 0.2s;
+          display: block;
+        }
+
+        .project-name:hover {
+          color: #3182ce;
+          text-decoration: underline;
         }
 
         .task-description {

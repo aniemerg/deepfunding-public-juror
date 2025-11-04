@@ -20,7 +20,6 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastSubmittedAt, setLastSubmittedAt] = useState(null)
   const [error, setError] = useState(null)
-  const [showWeights, setShowWeights] = useState(false)
 
   const screenType = 'comparison'
   const comparisonId = projectA && projectB ? `${projectA.repo}-vs-${projectB.repo}` : 'pending'
@@ -46,7 +45,6 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
       setSelectedWinner('')
       setMultiplier('')
       setError(null)
-      setShowWeights(false)
       
       // Notify parent of project change for navigation
       if (onProjectChange) {
@@ -86,7 +84,6 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
     setMultiplier('')
     setReasoning('')
     setError(null)
-    setShowWeights(false)
     setIsSubmitting(false) // Reset submitting state
     
     // Notify parent of project change for navigation
@@ -164,10 +161,6 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
     return <div>Loading...</div>
   }
 
-  const weightA = parseFloat(getFundingPercentage(projectA.repo))
-  const weightB = parseFloat(getFundingPercentage(projectB.repo))
-  const expectedRatio = weightA / weightB
-
   return (
     <div className="comparison-screen">
       <div className="content-container">
@@ -189,11 +182,15 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
               onClick={() => handleProjectSelect(projectA.repo)}
               disabled={isSubmitting}
             >
-              <div className="project-name">{projectA.repo}</div>
-              <div className="project-rank">Rank #{projectA.rank}</div>
-              {showWeights && (
-                <div className="project-weight">Weight: {weightA.toFixed(2)}%</div>
-              )}
+              <a
+                href={`https://github.com/${projectA.repo}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="project-name"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {projectA.repo}
+              </a>
             </button>
 
             <div className="vs-divider">VS</div>
@@ -203,11 +200,15 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
               onClick={() => handleProjectSelect(projectB.repo)}
               disabled={isSubmitting}
             >
-              <div className="project-name">{projectB.repo}</div>
-              <div className="project-rank">Rank #{projectB.rank}</div>
-              {showWeights && (
-                <div className="project-weight">Weight: {weightB.toFixed(2)}%</div>
-              )}
+              <a
+                href={`https://github.com/${projectB.repo}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="project-name"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {projectB.repo}
+              </a>
             </button>
           </div>
 
@@ -215,9 +216,23 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
             <div className="multiplier-section">
               <label htmlFor="multiplier">
                 How many times more valuable is{' '}
-                <strong>{formatRepoName(selectedWinner)}</strong>{' '}
-                compared to{' '}
-                <strong>{formatRepoName(selectedWinner === projectA.repo ? projectB.repo : projectA.repo)}</strong>?
+                <a
+                  href={`https://github.com/${selectedWinner}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="repo-link"
+                >
+                  {formatRepoName(selectedWinner)}
+                </a>
+                {' '}compared to{' '}
+                <a
+                  href={`https://github.com/${selectedWinner === projectA.repo ? projectB.repo : projectA.repo}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="repo-link"
+                >
+                  {formatRepoName(selectedWinner === projectA.repo ? projectB.repo : projectA.repo)}
+                </a>?
               </label>
               <div className="multiplier-container">
                 <input
@@ -254,27 +269,6 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
               rows="4"
               disabled={isSubmitting}
             />
-          </div>
-
-          <div className="context-section">
-            <button
-              type="button"
-              className="context-toggle"
-              onClick={() => setShowWeights(!showWeights)}
-            >
-              {showWeights ? 'Hide' : 'Show'} ELO weights for reference
-            </button>
-            {showWeights && (
-              <div className="context-info">
-                <p>
-                  Based on current ELO rankings, {weightA > weightB ? projectA.repo : projectB.repo} is{' '}
-                  {expectedRatio > 1 ? expectedRatio.toFixed(1) : (1/expectedRatio).toFixed(1)}x more valuable.
-                </p>
-                <p className="context-note">
-                  Your evaluation may differ from the current consensus - that's valuable input!
-                </p>
-              </div>
-            )}
           </div>
 
           {error && (
@@ -416,19 +410,26 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
           font-size: 1rem;
           font-weight: 600;
           color: #1a202c;
-          margin-bottom: 0.5rem;
+          text-decoration: none;
+          transition: color 0.2s;
+          display: block;
         }
 
-        .project-rank {
-          font-size: 0.85rem;
-          color: #4a5568;
-        }
-
-        .project-weight {
-          font-size: 0.85rem;
+        .project-name:hover {
           color: #3182ce;
-          margin-top: 0.25rem;
-          font-weight: 500;
+          text-decoration: underline;
+        }
+
+        .repo-link {
+          color: #3182ce;
+          font-weight: 600;
+          text-decoration: none;
+          transition: all 0.2s;
+        }
+
+        .repo-link:hover {
+          color: #1d4ed8;
+          text-decoration: underline;
         }
 
         .vs-divider {
@@ -528,44 +529,6 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
         .reasoning-input:disabled {
           background-color: #f7fafc;
           cursor: not-allowed;
-        }
-
-        .context-section {
-          text-align: center;
-        }
-
-        .context-toggle {
-          background: none;
-          border: none;
-          color: #3182ce;
-          text-decoration: underline;
-          cursor: pointer;
-          font-size: 0.9rem;
-          padding: 0.25rem;
-        }
-
-        .context-toggle:hover {
-          color: #2c5282;
-        }
-
-        .context-info {
-          margin-top: 1rem;
-          padding: 1rem;
-          background-color: #f0f9ff;
-          border: 1px solid #0ea5e9;
-          border-radius: 6px;
-        }
-
-        .context-info p {
-          margin: 0.5rem 0;
-          color: #0c4a6e;
-          font-size: 0.9rem;
-          line-height: 1.5;
-        }
-
-        .context-note {
-          font-style: italic;
-          font-size: 0.85rem !important;
         }
 
         .error-message {

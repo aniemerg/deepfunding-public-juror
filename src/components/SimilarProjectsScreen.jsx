@@ -174,13 +174,28 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
         <div className="target-section">
           <div className="target-label">Target Project:</div>
           <div className="target-project">
-            <strong>{targetProject.repo}</strong>
+            <a
+              href={`https://github.com/${targetProject.repo}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="repo-link"
+            >
+              {targetProject.repo}
+            </a>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="similarity-form">
           <div className="question-text">
-            Name a project of equal or greater value to <strong>{formatRepoName(targetProject.repo)}</strong>, 
+            Name a project of equal or greater value to{' '}
+            <a
+              href={`https://github.com/${targetProject.repo}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="repo-link-inline"
+            >
+              {formatRepoName(targetProject.repo)}
+            </a>,
             within a factor of two (or select "None" if no similar projects exist):
           </div>
 
@@ -212,7 +227,15 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
                     onClick={() => handleSuggestionClick(suggestion)}
                     disabled={isSubmitting}
                   >
-                    <div className="suggestion-repo">{suggestion.repo}</div>
+                    <a
+                      href={`https://github.com/${suggestion.repo}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="suggestion-repo"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {suggestion.repo}
+                    </a>
                   </button>
                 ))}
               </div>
@@ -222,7 +245,24 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
           {selectedProject && selectedProject !== 'None' && (
             <div className="form-group">
               <label htmlFor="multiplier">
-                How many times more valuable is {formatRepoName(selectedProject)} compared to {formatRepoName(targetProject.repo)}?
+                How many times more valuable is{' '}
+                <a
+                  href={`https://github.com/${selectedProject}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="repo-link-inline"
+                >
+                  {formatRepoName(selectedProject)}
+                </a>
+                {' '}compared to{' '}
+                <a
+                  href={`https://github.com/${targetProject.repo}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="repo-link-inline"
+                >
+                  {formatRepoName(targetProject.repo)}
+                </a>?
               </label>
               <div className="multiplier-container">
                 <input
@@ -364,10 +404,30 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
           text-align: center;
         }
 
-        .target-project strong {
+        .repo-link {
           font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
           font-size: 1.1rem;
           color: #0c4a6e;
+          font-weight: 600;
+          text-decoration: none;
+          transition: all 0.2s;
+        }
+
+        .repo-link:hover {
+          color: #3182ce;
+          text-decoration: underline;
+        }
+
+        .repo-link-inline {
+          color: #3182ce;
+          font-weight: 600;
+          text-decoration: none;
+          transition: all 0.2s;
+        }
+
+        .repo-link-inline:hover {
+          color: #1d4ed8;
+          text-decoration: underline;
         }
 
         .similarity-form {
@@ -458,6 +518,14 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
           font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
           font-size: 0.9rem;
           color: #2d3748;
+          text-decoration: none;
+          transition: color 0.2s;
+          display: block;
+        }
+
+        .suggestion-repo:hover {
+          color: #3182ce;
+          text-decoration: underline;
         }
 
         .multiplier-container {
