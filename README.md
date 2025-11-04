@@ -22,9 +22,6 @@ A Web3-enabled evaluation system for the Ethereum ecosystem, where qualified jur
 - **Deployment**: Cloudflare Pages with OpenNext adapter
 - **Runtime**: Node.js compatibility mode for universal KV access
 
-📊 **Data Structure**: See [`design/GOOGLE_SHEETS_STRUCTURE.md`](./design/GOOGLE_SHEETS_STRUCTURE.md)  
-📊 **Project Dataset**: See [`design/elo.csv`](./design/elo.csv) - 98 Ethereum projects with ELO rankings
-
 ## Getting Started
 
 ### Prerequisites
@@ -92,27 +89,14 @@ src/
 │   └── evaluation/         # Main evaluation screens
 ├── components/             # Reusable UI components
 ├── hooks/                  # Custom React hooks (useAuth, useAutoSave)
-├── lib/                    # Configuration and Google Sheets integration
-└── design/
-    ├── GOOGLE_SHEETS_STRUCTURE.md  # 📊 Complete data schema
-    ├── elo.csv                     # 📊 98 Ethereum projects with ELO rankings
-    ├── ELO_DATASET.md             # 📊 Dataset documentation and analysis
-    ├── PATHFINDER_EXAMPLES.md     # 📋 Interface examples and patterns
-    ├── ComparisonFeedbackInterface/ # 📋 Advanced comparison example
-    ├── RangeDefinitionInterface/   # 📋 Personal scale definition example
-    └── SimilarProjectsInterface/   # 📋 Value clustering example
+└── lib/                    # Configuration and Google Sheets integration
 ```
 
 ## Learn More
 
-- **📊 [Google Sheets Data Structure](./design/GOOGLE_SHEETS_STRUCTURE.md)** - Complete schema reference
-- **📊 [Project Dataset](./design/elo.csv)** - 98 Ethereum projects with ELO rankings and weights
-- **📊 [Dataset Documentation](./design/ELO_DATASET.md)** - Dataset analysis and usage guide
-- **📋 [Pathfinder Interface Examples](./design/PATHFINDER_EXAMPLES.md)** - Reference implementations for evaluation screens
-- [Design Documents](./design/) - Complete system architecture and implementation guide  
-- [CLAUDE.md](./CLAUDE.md) - AI assistant reference for this project
 - [Next.js Documentation](https://nextjs.org/docs) - Learn about Next.js features and API
 - [Cloudflare Pages](https://pages.cloudflare.com/) - Deployment platform documentation
+- [SIWE Documentation](https://login.xyz/) - Sign-In with Ethereum standard
 
 ## Implementation Status
 
