@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useAutosave, useDataSubmission } from '@/hooks/useAutoSave'
 
-export function BackgroundScreen({ onNext, onBack }) {
+export function BackgroundScreen({ onNext, onBack, onForward, isCompleted }) {
   const { user } = useAuth()
   const [backgroundText, setBackgroundText] = useState('')
   const [wasSkipped, setWasSkipped] = useState(false)
@@ -162,21 +162,32 @@ export function BackgroundScreen({ onNext, onBack }) {
           </button>
 
           <div className="right-buttons">
-            <button
-              onClick={handleSkip}
-              className="skip-button"
-              disabled={isSubmitting}
-            >
-              Skip this step
-            </button>
-            
-            <button
-              onClick={handleContinue}
-              className="nav-button continue-button"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Submitting...' : 'Continue'}
-            </button>
+            {!isCompleted && (
+              <button
+                onClick={handleSkip}
+                className="skip-button"
+                disabled={isSubmitting}
+              >
+                Skip this step
+              </button>
+            )}
+
+            {isCompleted && onForward ? (
+              <button
+                onClick={onForward}
+                className="nav-button continue-button"
+              >
+                Continue →
+              </button>
+            ) : (
+              <button
+                onClick={handleContinue}
+                className="nav-button continue-button"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Submitting...' : 'Continue'}
+              </button>
+            )}
           </div>
         </div>
       </div>

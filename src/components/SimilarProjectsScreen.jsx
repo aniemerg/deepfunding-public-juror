@@ -11,11 +11,12 @@ import {
   getFundingPercentage 
 } from '@/lib/eloHelpers'
 
-export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onNext, onBack, onProjectChange }) {
+export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onNext, onBack, onForward, isCompleted, onProjectChange }) {
   const { user } = useAuth()
   const [targetProject, setTargetProject] = useState(null)
   const [selectedProject, setSelectedProject] = useState('')
   const [multiplier, setMultiplier] = useState('1.0')
+  const [reasoning, setReasoning] = useState('')
   const [suggestions, setSuggestions] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastSubmittedAt, setLastSubmittedAt] = useState(null)
@@ -27,6 +28,7 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
     targetProject: targetProject?.repo || '',
     similarProject: selectedProject,
     similarMultiplier: multiplier ? parseFloat(multiplier) : null,
+    reasoning: reasoning,
     similarTimestamp: new Date().toISOString()
   }
 
@@ -70,6 +72,7 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
     setTargetProject(newTarget)
     setSelectedProject('')
     setMultiplier('1.0')
+    setReasoning('')
     setError(null)
     setIsSubmitting(false) // Reset submitting state
     
@@ -89,6 +92,7 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
       if (submission.exists && submission.data) {
         setSelectedProject(submission.data.similarProject || '')
         setMultiplier(submission.data.similarMultiplier ? String(submission.data.similarMultiplier) : '1.0')
+        setReasoning(submission.data.reasoning || '')
         setLastSubmittedAt(submission.data.similarTimestamp)
       }
     } catch (error) {
@@ -240,6 +244,21 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
             </div>
           )}
 
+          <div className="reasoning-section">
+            <label htmlFor="reasoning" className="reasoning-label">
+              Why this selection? (optional)
+            </label>
+            <textarea
+              id="reasoning"
+              value={reasoning}
+              onChange={(e) => setReasoning(e.target.value)}
+              placeholder="Explain your reasoning..."
+              className="reasoning-input"
+              rows="4"
+              disabled={isSubmitting}
+            />
+          </div>
+
           {error && (
             <div className="error-message">
               {error}
@@ -261,13 +280,23 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
             >
               ← Back
             </button>
-            <button
-              type="submit"
-              className="nav-button continue-button"
-              disabled={isSubmitting || !selectedProject}
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit Comparison'}
-            </button>
+            {isCompleted && onForward ? (
+              <button
+                type="button"
+                onClick={onForward}
+                className="nav-button continue-button"
+              >
+                Continue →
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="nav-button continue-button"
+                disabled={isSubmitting || !selectedProject}
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit Comparison'}
+              </button>
+            )}
           </div>
         </form>
       </div>
@@ -462,6 +491,40 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
         .multiplier-hint {
           font-size: 0.85rem;
           color: #718096;
+        }
+
+        .reasoning-section {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .reasoning-label {
+          font-size: 1rem;
+          font-weight: 500;
+          color: #2d3748;
+        }
+
+        .reasoning-input {
+          width: 100%;
+          padding: 0.75rem;
+          border: 2px solid #cbd5e0;
+          border-radius: 6px;
+          font-size: 1rem;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          resize: vertical;
+          min-height: 100px;
+        }
+
+        .reasoning-input:focus {
+          outline: none;
+          border-color: #3182ce;
+          box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+
+        .reasoning-input:disabled {
+          background-color: #f7fafc;
+          cursor: not-allowed;
         }
 
         .error-message {

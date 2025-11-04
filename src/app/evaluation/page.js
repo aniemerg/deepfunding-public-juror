@@ -95,6 +95,14 @@ export default function EvaluationPage() {
     }
   }
 
+  const handleForward = () => {
+    const currentIndex = navigationState.navigationItems.findIndex(item => item.id === navigationState.currentScreen)
+    if (currentIndex < navigationState.navigationItems.length - 1) {
+      const nextItem = navigationState.navigationItems[currentIndex + 1]
+      navigateToScreen(nextItem.id)
+    }
+  }
+
   const handleBack = () => {
     const currentIndex = navigationState.navigationItems.findIndex(item => item.id === navigationState.currentScreen)
     if (currentIndex > 0) {
@@ -126,13 +134,19 @@ export default function EvaluationPage() {
         </div>
       )
     }
-    
+
+    const isCompleted = currentNavItem.status === 'completed'
+    const currentIndex = navigationState.navigationItems.findIndex(item => item.id === navigationState.currentScreen)
+    const hasNext = currentIndex < navigationState.navigationItems.length - 1
+
     switch (currentNavItem.screenType) {
       case 'background':
         return (
-          <BackgroundScreen 
+          <BackgroundScreen
             onNext={handleNext}
             onBack={handleBack}
+            onForward={hasNext ? handleForward : null}
+            isCompleted={isCompleted}
           />
         )
       case 'range_definition':
@@ -140,6 +154,8 @@ export default function EvaluationPage() {
           <RangeDefinitionScreen
             onNext={handleNext}
             onBack={handleBack}
+            onForward={hasNext ? handleForward : null}
+            isCompleted={isCompleted}
           />
         )
       case 'similar_projects':
@@ -149,6 +165,8 @@ export default function EvaluationPage() {
             targetProject={currentNavItem.data?.targetProject}
             onNext={handleNext}
             onBack={handleBack}
+            onForward={hasNext ? handleForward : null}
+            isCompleted={isCompleted}
           />
         )
       case 'comparison':
@@ -158,6 +176,8 @@ export default function EvaluationPage() {
             projectPair={currentNavItem.data?.projectPair}
             onNext={handleNext}
             onBack={handleBack}
+            onForward={hasNext ? handleForward : null}
+            isCompleted={isCompleted}
           />
         )
       case 'originality':
@@ -167,6 +187,8 @@ export default function EvaluationPage() {
             targetProject={currentNavItem.data?.targetProject}
             onNext={handleNext}
             onBack={handleBack}
+            onForward={hasNext ? handleForward : null}
+            isCompleted={isCompleted}
           />
         )
       case 'completion':

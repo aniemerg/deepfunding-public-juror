@@ -9,6 +9,7 @@
  *   node scripts/kv-manager.js export <user> <file> [--env=preview|production]
  *   node scripts/kv-manager.js clear <user> [--env=preview|production]
  *   node scripts/kv-manager.js clear-pattern <pattern> [--env=preview|production]
+ *   node scripts/kv-manager.js clear-local
  *
  * For standalone execution: chmod +x scripts/kv-manager.js && ./scripts/kv-manager.js
  */
@@ -82,7 +83,7 @@ function execWrangler(command, env = 'preview') {
 
   try {
     const output = execSync(
-      `wrangler kv key ${command} --namespace-id=${namespaceId} ${previewFlag}`,
+      `wrangler kv key ${command} --namespace-id=${namespaceId} ${previewFlag} --remote`,
       { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
     );
     return output.trim();
@@ -458,6 +459,50 @@ async function cmdClearPattern(pattern, env) {
   success(`Deleted ${deleted} keys`);
 }
 
+// Clear local development storage
+async function cmdClearLocal() {
+  const localStoragePath = path.join(process.cwd(), '.wrangler', 'state');
+
+  warning('\nAbout to delete LOCAL development storage');
+  log('This will clear data stored by "npm run preview"');
+  log(`Path: ${localStoragePath}\n`);
+
+  if (!fs.existsSync(localStoragePath)) {
+    warning('Local storage directory does not exist. Nothing to clear.');
+    return;
+  }
+
+  // Check if there's data
+  try {
+    const files = fs.readdirSync(localStoragePath, { recursive: true });
+    const kvFiles = files.filter(f => f.includes('kv'));
+    if (kvFiles.length === 0) {
+      warning('No KV storage files found. Nothing to clear.');
+      return;
+    }
+    log(`Found ${kvFiles.length} KV storage file(s)\n`, colors.yellow);
+  } catch (err) {
+    error(`Error reading storage directory: ${err.message}`);
+    return;
+  }
+
+  const confirmed = await askConfirmation('Delete local development storage?');
+  if (!confirmed) {
+    log('Cancelled.');
+    return;
+  }
+
+  try {
+    fs.rmSync(localStoragePath, { recursive: true, force: true });
+    success('Local development storage cleared!');
+    info('Note: Remote KV (preview/production) is not affected.');
+    info('Run "npm run preview" to start fresh.');
+  } catch (err) {
+    error(`Failed to clear local storage: ${err.message}`);
+    throw err;
+  }
+}
+
 // Show help
 function showHelp() {
   log('\nKV Manager - Development tool for managing Cloudflare KV data\n', colors.bright);
@@ -467,12 +512,14 @@ function showHelp() {
   log('  kv-manager export <user> <file> [--env=preview|production]');
   log('  kv-manager clear <user> [--env=preview|production]');
   log('  kv-manager clear-pattern <pattern> [--env=preview|production]');
+  log('  kv-manager clear-local');
   log('\nCommands:', colors.cyan);
-  log('  list              List all users in KV');
+  log('  list              List all users in remote KV');
   log('  inspect <user>    View data for a user (ENS name or address)');
   log('  export <user> <file>   Export user data to JSON file');
-  log('  clear <user>      Delete all data for a user');
-  log('  clear-pattern <pattern>   Delete keys matching pattern (supports *)');
+  log('  clear <user>      Delete all data for a user from remote KV');
+  log('  clear-pattern <pattern>   Delete keys matching pattern from remote KV');
+  log('  clear-local       Delete local development storage (.wrangler/state)');
   log('\nFlags:', colors.cyan);
   log('  --env=preview     Use preview KV (default)');
   log('  --env=production  Use production KV (requires extra confirmation)');
@@ -483,6 +530,7 @@ function showHelp() {
   log('  kv-manager export alice.eth backup.json');
   log('  kv-manager clear vitalik.eth --env=production');
   log('  kv-manager clear-pattern "user:0x742d:background:*"');
+  log('  kv-manager clear-local   # Clear local dev storage for npm run preview');
   log('');
 }
 
@@ -537,6 +585,10 @@ async function main() {
           process.exit(1);
         }
         await cmdClearPattern(params[0], env);
+        break;
+
+      case 'clear-local':
+        await cmdClearLocal();
         break;
 
       default:

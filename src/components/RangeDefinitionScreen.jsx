@@ -5,11 +5,12 @@ import { useAuth } from '@/hooks/useAuth'
 import { useAutosave, useDataSubmission } from '@/hooks/useAutoSave'
 import { getAllProjects, formatRepoName } from '@/lib/eloHelpers'
 
-export function RangeDefinitionScreen({ onNext, onBack }) {
+export function RangeDefinitionScreen({ onNext, onBack, onForward, isCompleted }) {
   const { user } = useAuth()
   const [mostValuable, setMostValuable] = useState('')
   const [leastValuable, setLeastValuable] = useState('')
   const [multiplier, setMultiplier] = useState('')
+  const [reasoning, setReasoning] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastSubmittedAt, setLastSubmittedAt] = useState(null)
   const [error, setError] = useState(null)
@@ -20,6 +21,7 @@ export function RangeDefinitionScreen({ onNext, onBack }) {
     mostValuableProject: mostValuable,
     leastValuableProject: leastValuable,
     scaleMultiplier: multiplier ? parseFloat(multiplier) : null,
+    reasoning: reasoning,
     scaleTimestamp: new Date().toISOString()
   }
 
@@ -41,6 +43,7 @@ export function RangeDefinitionScreen({ onNext, onBack }) {
         setMostValuable(submission.data.mostValuableProject || '')
         setLeastValuable(submission.data.leastValuableProject || '')
         setMultiplier(submission.data.scaleMultiplier ? String(submission.data.scaleMultiplier) : '')
+        setReasoning(submission.data.reasoning || '')
         setLastSubmittedAt(submission.data.scaleTimestamp)
       }
     } catch (error) {
@@ -167,6 +170,21 @@ export function RangeDefinitionScreen({ onNext, onBack }) {
               </span>
             </div>
 
+            <div className="form-group">
+              <label htmlFor="reasoning" className="reasoning-label">
+                Why this scale? (optional)
+              </label>
+              <textarea
+                id="reasoning"
+                value={reasoning}
+                onChange={(e) => setReasoning(e.target.value)}
+                placeholder="Explain your reasoning for this personal scale..."
+                className="reasoning-input"
+                rows="4"
+                disabled={isSubmitting}
+              />
+            </div>
+
             {error && (
               <div className="error-message">
                 {error}
@@ -188,13 +206,23 @@ export function RangeDefinitionScreen({ onNext, onBack }) {
               >
                 ← Back
               </button>
-              <button
-                type="submit"
-                className="nav-button continue-button"
-                disabled={isSubmitting || !mostValuable || !leastValuable || !multiplier}
-              >
-                {isSubmitting ? 'Submitting...' : 'Define My Scale'}
-              </button>
+              {isCompleted && onForward ? (
+                <button
+                  type="button"
+                  onClick={onForward}
+                  className="nav-button continue-button"
+                >
+                  Continue →
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="nav-button continue-button"
+                  disabled={isSubmitting || !mostValuable || !leastValuable || !multiplier}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Define My Scale'}
+                </button>
+              )}
             </div>
           </form>
         </div>
@@ -312,6 +340,34 @@ export function RangeDefinitionScreen({ onNext, onBack }) {
           font-size: 0.85rem;
           color: #718096;
           font-style: italic;
+        }
+
+        .reasoning-label {
+          font-size: 1rem;
+          font-weight: 500;
+          color: #2d3748;
+        }
+
+        .reasoning-input {
+          width: 100%;
+          padding: 0.75rem;
+          border: 2px solid #cbd5e0;
+          border-radius: 6px;
+          font-size: 1rem;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          resize: vertical;
+          min-height: 100px;
+        }
+
+        .reasoning-input:focus {
+          outline: none;
+          border-color: #3182ce;
+          box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+
+        .reasoning-input:disabled {
+          background-color: #f7fafc;
+          cursor: not-allowed;
         }
 
         .error-message {

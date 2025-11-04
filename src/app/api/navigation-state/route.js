@@ -62,30 +62,43 @@ export async function POST(req) {
 async function deriveNavigationStateFromKV(userAddress, kv) {
   // Load plan
   const planData = await kv.get(`user:${userAddress}:evaluation-plan`)
-  const plan = planData ? JSON.parse(planData) : null
-  
+  let plan = planData ? JSON.parse(planData) : null
+
+  // Migrate plan schema if needed
+  if (plan) {
+    let needsSave = false
+
+    // Migration: v0 → v1 (added originalityProjects field)
+    if (!plan.version || plan.version < 1) {
+      const { getRandomProjectsForOriginality } = await import('@/lib/eloHelpers')
+      plan.originalityProjects = getRandomProjectsForOriginality(3)
+      plan.version = 1
+      needsSave = true
+      console.log(`Migrating plan to v1 (added originality) for user: ${userAddress}`)
+    }
+
+    // Future migrations go here:
+    // if (plan.version < 2) {
+    //   plan.newField = ...
+    //   plan.version = 2
+    //   needsSave = true
+    // }
+
+    if (needsSave) {
+      await kv.put(`user:${userAddress}:evaluation-plan`, JSON.stringify(plan))
+      console.log(`Saved migrated plan v${plan.version} for user: ${userAddress}`)
+    }
+  }
+
   if (!plan) {
     // Return a stub plan with just background and range_definition
-    // Check completion status for these screens
+    // Check completion and in-progress status for these screens
     const backgroundCompleted = await kv.get(`user:${userAddress}:completed:background`)
     const rangeCompleted = await kv.get(`user:${userAddress}:completed:range_definition`)
-    
-    const navigationItems = [
-      {
-        id: 'background',
-        screenType: 'background',
-        text: 'Background',
-        status: backgroundCompleted ? 'completed' : 'current'
-      },
-      {
-        id: 'range_definition',
-        screenType: 'range_definition',
-        text: 'Personal Scale',
-        status: rangeCompleted ? 'completed' : (backgroundCompleted ? 'current' : 'pending')
-      }
-    ]
-    
-    // Determine current screen
+    const backgroundInProgress = await kv.get(`user:${userAddress}:in-progress:background`)
+    const rangeInProgress = await kv.get(`user:${userAddress}:in-progress:range_definition`)
+
+    // Determine current screen first
     let currentScreen = 'background'
     if (backgroundCompleted && !rangeCompleted) {
       currentScreen = 'range_definition'
@@ -93,7 +106,40 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
       // Both completed but no plan yet - stay on range_definition
       currentScreen = 'range_definition'
     }
-    
+
+    // Mark current screen as in-progress if not already completed
+    if (currentScreen === 'background' && !backgroundCompleted) {
+      await kv.put(`user:${userAddress}:in-progress:background`, JSON.stringify({
+        startedAt: new Date().toISOString()
+      }))
+    } else if (currentScreen === 'range_definition' && !rangeCompleted) {
+      await kv.put(`user:${userAddress}:in-progress:range_definition`, JSON.stringify({
+        startedAt: new Date().toISOString()
+      }))
+    }
+
+    const getStatus = (id, completed, inProgress) => {
+      if (completed) return 'completed'
+      if (id === currentScreen) return 'current'
+      if (inProgress) return 'in-progress'
+      return 'pending'
+    }
+
+    const navigationItems = [
+      {
+        id: 'background',
+        screenType: 'background',
+        text: 'Background',
+        status: getStatus('background', backgroundCompleted, backgroundInProgress)
+      },
+      {
+        id: 'range_definition',
+        screenType: 'range_definition',
+        text: 'Personal Scale',
+        status: getStatus('range_definition', rangeCompleted, rangeInProgress)
+      }
+    ]
+
     return {
       navigationItems,
       currentScreen,
@@ -101,9 +147,10 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
     }
   }
   
-  // Load completion status for all possible screens
+  // Load completion and in-progress status for all possible screens
   const completedScreens = new Set()
-  
+  const inProgressScreens = new Set()
+
   // Check each screen type
   const screenChecks = [
     'background',
@@ -116,21 +163,37 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
   if (plan.originalityProjects) {
     screenChecks.push(...plan.originalityProjects.map((_, i) => `originality_${i + 1}`))
   }
-  
+
   for (const screenId of screenChecks) {
     const completed = await kv.get(`user:${userAddress}:completed:${screenId}`)
+    const inProgress = await kv.get(`user:${userAddress}:in-progress:${screenId}`)
     if (completed) {
       completedScreens.add(screenId)
+    } else if (inProgress) {
+      inProgressScreens.add(screenId)
     }
   }
   
-  // Create navigation items from plan + completion data
-  const navigationItems = createNavigationFromPlan(plan, completedScreens)
-  
+  // Create navigation items from plan + completion and in-progress data
+  const navigationItems = createNavigationFromPlan(plan, completedScreens, inProgressScreens)
+
   // Find current screen (first non-completed)
   const currentScreen = findCurrentScreen(navigationItems, completedScreens)
-  
-  return { navigationItems, currentScreen, plan }
+
+  // Mark current screen as in-progress if not already completed
+  if (!completedScreens.has(currentScreen) && currentScreen !== 'completion') {
+    await kv.put(`user:${userAddress}:in-progress:${currentScreen}`, JSON.stringify({
+      startedAt: new Date().toISOString()
+    }))
+  }
+
+  // Update the current screen's status to 'current'
+  const updatedNavigationItems = navigationItems.map(item => ({
+    ...item,
+    status: item.id === currentScreen ? 'current' : item.status
+  }))
+
+  return { navigationItems: updatedNavigationItems, currentScreen, plan }
 }
 
 function getInitialNavigationState() {
@@ -170,20 +233,26 @@ function getInitialNavigationStateWithStub() {
   }
 }
 
-function createNavigationFromPlan(plan, completedScreens) {
+function createNavigationFromPlan(plan, completedScreens, inProgressScreens) {
+  const getStatus = (id) => {
+    if (completedScreens.has(id)) return 'completed'
+    if (inProgressScreens.has(id)) return 'in-progress'
+    return 'pending'
+  }
+
   const items = [
     {
       id: 'background',
       screenType: 'background',
       text: 'Background',
-      status: completedScreens.has('background') ? 'completed' : 'pending',
+      status: getStatus('background'),
       data: null
     },
     {
       id: 'range_definition',
       screenType: 'range_definition',
       text: 'Range Definition',
-      status: completedScreens.has('range_definition') ? 'completed' : 'pending',
+      status: getStatus('range_definition'),
       data: null
     }
   ]
@@ -195,7 +264,7 @@ function createNavigationFromPlan(plan, completedScreens) {
       id,
       screenType: 'similar_projects',
       text: `Similar: ${project.repo}`,
-      status: completedScreens.has(id) ? 'completed' : 'pending',
+      status: getStatus(id),
       data: { targetProject: project }
     })
   })
@@ -207,7 +276,7 @@ function createNavigationFromPlan(plan, completedScreens) {
       id,
       screenType: 'comparison',
       text: `Comparison: ${pair[0].repo} vs ${pair[1].repo}`,
-      status: completedScreens.has(id) ? 'completed' : 'pending',
+      status: getStatus(id),
       data: { projectPair: pair }
     })
   })
@@ -220,7 +289,7 @@ function createNavigationFromPlan(plan, completedScreens) {
         id,
         screenType: 'originality',
         text: `Originality: ${project.repo}`,
-        status: completedScreens.has(id) ? 'completed' : 'pending',
+        status: getStatus(id),
         data: { targetProject: project }
       })
     })
@@ -258,7 +327,8 @@ async function handleCompleteScreen(userAddress, screenId, data, kv) {
     return Response.json({ error: 'screenId and data required' }, { status: 400 })
   }
   
-  // 1. Mark as completed in KV
+  // 1. Mark as completed in KV (and remove in-progress status)
+  await kv.delete(`user:${userAddress}:in-progress:${screenId}`)
   await kv.put(`user:${userAddress}:completed:${screenId}`, JSON.stringify({
     completed: true,
     timestamp: new Date().toISOString(),
@@ -286,6 +356,7 @@ async function handleCompleteScreen(userAddress, screenId, data, kv) {
       const originalityProjects = getRandomProjectsForOriginality(3)
 
       const plan = {
+        version: 1,  // Schema version for future migrations
         similarProjects,
         comparisons,
         originalityProjects,
@@ -313,34 +384,52 @@ async function handleNavigateToScreen(userAddress, screenId, kv) {
   if (!screenId) {
     return Response.json({ error: 'screenId required' }, { status: 400 })
   }
-  
+
   // 1. Get current state to validate navigation
   const currentState = await deriveNavigationStateFromKV(userAddress, kv)
   const targetItem = currentState.navigationItems.find(item => item.id === screenId)
-  
+
   if (!targetItem) {
     return Response.json({ error: 'Screen not found' }, { status: 404 })
   }
-  
-  // Only allow navigation to completed screens or the current screen
-  if (targetItem.status !== 'completed' && targetItem.status !== 'current') {
-    return Response.json({ error: 'Navigation not allowed to pending screen' }, { status: 400 })
+
+  // Only allow navigation to completed, in-progress, or current screens
+  const allowedStatuses = ['completed', 'in-progress', 'current']
+  const isCurrentScreen = screenId === currentState.currentScreen
+
+  if (!allowedStatuses.includes(targetItem.status) && !isCurrentScreen) {
+    return Response.json({
+      error: 'Navigation not allowed to pending screen',
+      details: `Screen ${screenId} has status ${targetItem.status}`
+    }, { status: 400 })
   }
-  
-  // 2. Update navigation state
-  const newState = {
-    ...currentState,
-    currentScreen: screenId,
-    navigationItems: currentState.navigationItems.map(item => ({
-      ...item,
-      status: item.id === screenId ? 'current' : 
-              item.status === 'current' ? 'completed' : item.status
+
+  // 2. Mark as in-progress if not already completed
+  const completed = await kv.get(`user:${userAddress}:completed:${screenId}`)
+  if (!completed && screenId !== 'completion') {
+    await kv.put(`user:${userAddress}:in-progress:${screenId}`, JSON.stringify({
+      startedAt: new Date().toISOString()
     }))
   }
-  
-  // 3. Cache the new state
+
+  // 3. Update navigation state - just change currentScreen, keep status from KV
+  const newState = {
+    ...currentState,
+    currentScreen: screenId
+    // navigationItems stay the same - their status comes from KV completion data
+  }
+
+  // 4. Update status of the new current screen to 'current'
+  newState.navigationItems = newState.navigationItems.map(item => ({
+    ...item,
+    status: item.id === screenId ? 'current' :
+            item.id === currentState.currentScreen ? (item.status === 'current' ? 'in-progress' : item.status) :
+            item.status
+  }))
+
+  // 5. Cache the new state
   await kv.put(`user:${userAddress}:navigation-state`, JSON.stringify(newState))
-  
+
   return Response.json(newState)
 }
 

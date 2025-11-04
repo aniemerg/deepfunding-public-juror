@@ -101,6 +101,8 @@ export function NavigationSidebar({
         return '✓'
       case 'current':
         return '→'
+      case 'in-progress':
+        return '○'
       case 'skipped':
         return '⊘'
       default:
@@ -114,6 +116,8 @@ export function NavigationSidebar({
         return '#22543d' // Green
       case 'current':
         return '#1e40af' // Blue
+      case 'in-progress':
+        return '#7c3aed' // Purple
       case 'skipped':
         return '#d69e2e' // Orange
       default:
@@ -122,8 +126,8 @@ export function NavigationSidebar({
   }
 
   const isClickable = (item) => {
-    // Can click completed items or current item
-    return item.status === 'completed' || item.status === 'current'
+    // Can click completed items, current item, or in-progress items
+    return item.status === 'completed' || item.status === 'current' || item.status === 'in-progress'
   }
 
   return (
@@ -141,7 +145,7 @@ export function NavigationSidebar({
             <button
               key={item.id}
               className={`nav-item ${item.status} ${item.id === currentScreen ? 'active' : ''}`}
-              onClick={() => clickable && onNavigate(item.screenType)}
+              onClick={() => clickable && onNavigate(item.id)}
               disabled={!clickable}
               style={{
                 color: getStatusColor(item),
@@ -227,6 +231,11 @@ export function NavigationSidebar({
         .nav-item.current {
           background-color: rgba(30, 64, 175, 0.1);
           border: 1px solid rgba(30, 64, 175, 0.3);
+        }
+
+        .nav-item.in-progress {
+          background-color: rgba(124, 58, 237, 0.1);
+          border: 1px solid rgba(124, 58, 237, 0.2);
         }
 
         .nav-item.skipped {

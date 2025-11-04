@@ -4,6 +4,23 @@
 
 A CLI tool for managing Cloudflare KV data during development and debugging.
 
+### ⚠️ Important: Local vs Remote Storage
+
+This project uses **two separate storage systems**:
+
+1. **Local Development Storage** (`npm run preview`)
+   - Location: `.wrangler/state/v3/kv/`
+   - Uses Miniflare SQLite databases
+   - Fast, no network latency
+   - Cleared with: `npm run kv -- clear-local`
+
+2. **Remote Cloudflare KV** (preview & production)
+   - Cloud storage accessed with `--remote` flag
+   - Persistent across sessions
+   - Managed with: `list`, `inspect`, `clear`, etc.
+
+**When developing locally with `npm run preview`, you're using local storage, not remote KV.**
+
 ### Usage
 
 ```bash
@@ -11,6 +28,7 @@ A CLI tool for managing Cloudflare KV data during development and debugging.
 npm run kv -- list
 npm run kv -- inspect vitalik.eth --verbose
 npm run kv -- clear alice.eth
+npm run kv -- clear-local  # Clear local dev storage
 
 # Direct execution
 ./scripts/kv-manager.js list
@@ -66,6 +84,20 @@ npm run kv -- clear-pattern "user:0x742d35cc6634c0532925a3b844bc454e9e1ee421:bac
 npm run kv -- clear-pattern "user:*:navigation:*"
 ```
 
+#### `clear-local` - Clear local development storage
+```bash
+npm run kv -- clear-local
+```
+Deletes local development storage in `.wrangler/state`. Use this to clear data from `npm run preview`.
+
+**This does NOT affect remote Cloudflare KV (preview or production).**
+
+Example:
+```bash
+# Clear local dev storage to test fresh user flow
+npm run kv -- clear-local
+```
+
 ### Flags
 
 - `--env=preview` - Use preview KV namespace (default)
@@ -89,10 +121,10 @@ The tool automatically resolves ENS names to Ethereum addresses using a public R
 ### Examples
 
 ```bash
-# List all users in preview KV
+# List all users in remote preview KV
 npm run kv -- list
 
-# Inspect your own data
+# Inspect your own data in remote KV
 npm run kv -- inspect yourname.eth
 
 # See full data dump
@@ -101,8 +133,11 @@ npm run kv -- inspect yourname.eth --verbose
 # Export data for backup
 npm run kv -- export yourname.eth backup.json
 
-# Clear your data to test fresh
+# Clear your data from remote KV to test fresh
 npm run kv -- clear yourname.eth
+
+# Clear LOCAL dev storage (for npm run preview)
+npm run kv -- clear-local
 
 # Work with production data (use carefully!)
 npm run kv -- list --env=production
@@ -141,8 +176,12 @@ npm run kv -- clear yourname.eth
 
 ### Technical Details
 
-- Uses Wrangler CLI for KV operations
-- ENS resolution via viem library (already in dependencies)
+- Uses Wrangler CLI for KV operations with `--remote` flag to access actual Cloudflare KV
+- ENS resolution from KV profile data (fast, no RPC calls needed)
 - Colored terminal output for better readability
 - Pattern matching with regex support
 - JSON export/import capability
+
+### Known Issues & Fixes
+
+**Nov 4, 2025 Fix**: The tool now includes the `--remote` flag in all wrangler commands. Previously, wrangler would check local development storage instead of remote Cloudflare KV, causing the tool to report empty data even when keys existed. This has been resolved.

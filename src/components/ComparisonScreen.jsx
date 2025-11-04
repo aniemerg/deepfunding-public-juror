@@ -10,12 +10,13 @@ import {
   formatRepoName
 } from '@/lib/eloHelpers'
 
-export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBack, onProjectChange }) {
+export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBack, onForward, isCompleted, onProjectChange }) {
   const { user } = useAuth()
   const [projectA, setProjectA] = useState(null)
   const [projectB, setProjectB] = useState(null)
   const [multiplier, setMultiplier] = useState('')
   const [selectedWinner, setSelectedWinner] = useState('')
+  const [reasoning, setReasoning] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastSubmittedAt, setLastSubmittedAt] = useState(null)
   const [error, setError] = useState(null)
@@ -30,6 +31,7 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
     projectB: projectB?.repo || '',
     winner: selectedWinner,
     multiplier: multiplier ? parseFloat(multiplier) : null,
+    reasoning: reasoning,
     comparisonTimestamp: new Date().toISOString()
   }
 
@@ -82,6 +84,7 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
     setProjectB(pair[1])
     setSelectedWinner('')
     setMultiplier('')
+    setReasoning('')
     setError(null)
     setShowWeights(false)
     setIsSubmitting(false) // Reset submitting state
@@ -101,6 +104,7 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
       if (submission.exists && submission.data) {
         setSelectedWinner(submission.data.winner || '')
         setMultiplier(submission.data.multiplier ? String(submission.data.multiplier) : '')
+        setReasoning(submission.data.reasoning || '')
         setLastSubmittedAt(submission.data.comparisonTimestamp)
       }
     } catch (error) {
@@ -237,6 +241,21 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
             </div>
           )}
 
+          <div className="reasoning-section">
+            <label htmlFor="reasoning" className="reasoning-label">
+              Why this comparison? (optional)
+            </label>
+            <textarea
+              id="reasoning"
+              value={reasoning}
+              onChange={(e) => setReasoning(e.target.value)}
+              placeholder="Explain your reasoning..."
+              className="reasoning-input"
+              rows="4"
+              disabled={isSubmitting}
+            />
+          </div>
+
           <div className="context-section">
             <button
               type="button"
@@ -279,13 +298,23 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
             >
               ← Back
             </button>
-            <button
-              type="submit"
-              className="nav-button continue-button"
-              disabled={isSubmitting || !selectedWinner || !multiplier}
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit Comparison'}
-            </button>
+            {isCompleted && onForward ? (
+              <button
+                type="button"
+                onClick={onForward}
+                className="nav-button continue-button"
+              >
+                Continue →
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="nav-button continue-button"
+                disabled={isSubmitting || !selectedWinner || !multiplier}
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit Comparison'}
+              </button>
+            )}
           </form>
         </div>
       </div>
@@ -465,6 +494,40 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
           gap: 2rem;
           font-size: 0.85rem;
           color: #718096;
+        }
+
+        .reasoning-section {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+
+        .reasoning-label {
+          font-size: 1rem;
+          font-weight: 500;
+          color: #2d3748;
+        }
+
+        .reasoning-input {
+          width: 100%;
+          padding: 0.75rem;
+          border: 2px solid #cbd5e0;
+          border-radius: 6px;
+          font-size: 1rem;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          resize: vertical;
+          min-height: 100px;
+        }
+
+        .reasoning-input:focus {
+          outline: none;
+          border-color: #3182ce;
+          box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+
+        .reasoning-input:disabled {
+          background-color: #f7fafc;
+          cursor: not-allowed;
         }
 
         .context-section {

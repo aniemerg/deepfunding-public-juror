@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useAutosave, useDataSubmission } from '@/hooks/useAutoSave'
 
-export function OriginalityScreen({ targetProject, onNext, onBack }) {
+export function OriginalityScreen({ targetProject, onNext, onBack, onForward, isCompleted }) {
   const { user } = useAuth()
   const [originality, setOriginality] = useState(50)
   const [reasoning, setReasoning] = useState('')
@@ -217,13 +217,23 @@ export function OriginalityScreen({ targetProject, onNext, onBack }) {
             >
               ← Back
             </button>
-            <button
-              type="submit"
-              className="nav-button continue-button"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Submitting...' : 'Submit Assessment'}
-            </button>
+            {isCompleted && onForward ? (
+              <button
+                type="button"
+                onClick={onForward}
+                className="nav-button continue-button"
+              >
+                Continue →
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="nav-button continue-button"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Submitting...' : 'Submit Assessment'}
+              </button>
+            )}
           </form>
         </div>
       </div>
