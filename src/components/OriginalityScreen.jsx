@@ -72,11 +72,10 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
   }
 
   const getOriginalityLabel = (percentage) => {
-    if (percentage <= 20) return 'Derivative'
-    if (percentage <= 40) return 'Incremental'
-    if (percentage <= 60) return 'Hybrid'
-    if (percentage <= 80) return 'Innovative'
-    return 'Foundational'
+    if (percentage <= 30) return 'Fork/Wrapper'
+    if (percentage <= 50) return 'Heavily Dependent'
+    if (percentage <= 70) return 'Substantial Original'
+    return 'Mostly Original'
   }
 
   const handleSubmit = async (e) => {
@@ -121,9 +120,9 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
     <div className="originality-screen">
       <div className="content-container">
         <header className="screen-header">
-          <h1>Originality Assessment</h1>
+          <h1>Credit Attribution</h1>
           <p className="subtitle">
-            Evaluate intrinsic vs derivative value
+            How much credit belongs to this project vs. its dependencies?
           </p>
         </header>
 
@@ -132,16 +131,19 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
             <div className="project-name">{targetProject.repo}</div>
           </div>
 
-          <div className="question-section">
-            <label className="question-label">
-              How original is this project?
-            </label>
-            <div className="scale-description">
-              <span className="scale-anchor">0% = Derivative (implementation of existing ideas)</span>
-              <span className="scale-anchor">25% = Incremental (meaningful improvements)</span>
-              <span className="scale-anchor">50% = Hybrid (mix of novel and derivative)</span>
-              <span className="scale-anchor">75% = Innovative (significant original contributions)</span>
-              <span className="scale-anchor">100% = Foundational (created entirely new paradigms)</span>
+          <div className="task-description">
+            <p>
+              In this task, you are determining the percentage of this project's value to Ethereum
+              that comes from its original work. We're splitting credit between the original contributions
+              made by this project and the dependencies it builds on—the libraries, frameworks, and tools
+              it imports. We strongly recommend reviewing the GitHub repository to understand what the
+              project does, what it builds upon, and how it provides value before making this determination.
+            </p>
+            <p className="guide-intro">Suggested percentages as a guide:</p>
+            <div className="percentage-guide">
+              <div className="percentage-item"><strong>20%</strong> – Mostly a fork or wrapper</div>
+              <div className="percentage-item"><strong>50%</strong> – Heavily dependent with substantial original work</div>
+              <div className="percentage-item"><strong>80%</strong> – Mostly original work</div>
             </div>
           </div>
 
@@ -292,32 +294,44 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
           color: #0c4a6e;
         }
 
-        .question-section {
-          text-align: center;
+        .task-description {
+          padding: 1.5rem;
+          background: #f7fafc;
+          border-radius: 8px;
+          margin-bottom: 1.5rem;
         }
 
-        .question-label {
-          display: block;
-          font-size: 1.25rem;
-          font-weight: 500;
+        .task-description p {
+          line-height: 1.6;
           color: #2d3748;
-          margin-bottom: 1rem;
+          margin: 0 0 1rem 0;
         }
 
-        .scale-description {
+        .guide-intro {
+          font-weight: 600;
+          color: #1a202c;
+          margin-bottom: 0.75rem !important;
+        }
+
+        .percentage-guide {
           display: flex;
           flex-direction: column;
           gap: 0.5rem;
-          padding: 1rem;
-          background: #f7fafc;
-          border-radius: 6px;
-          font-size: 0.9rem;
-          color: #4a5568;
-          text-align: left;
+          margin-top: 0.75rem;
         }
 
-        .scale-anchor {
-          line-height: 1.5;
+        .percentage-item {
+          padding: 0.75rem;
+          background: white;
+          border-left: 3px solid #3b82f6;
+          border-radius: 4px;
+          color: #4a5568;
+          font-size: 0.95rem;
+        }
+
+        .percentage-item strong {
+          color: #1e40af;
+          font-weight: 600;
         }
 
         .controls-section {
