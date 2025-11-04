@@ -111,6 +111,11 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
     ...plan.similarProjects.map((_, i) => `similar_projects_${i + 1}`),
     ...plan.comparisons.map((_, i) => `comparison_${i + 1}`)
   ]
+
+  // Add originality screens if they exist in the plan
+  if (plan.originalityProjects) {
+    screenChecks.push(...plan.originalityProjects.map((_, i) => `originality_${i + 1}`))
+  }
   
   for (const screenId of screenChecks) {
     const completed = await kv.get(`user:${userAddress}:completed:${screenId}`)
@@ -207,6 +212,20 @@ function createNavigationFromPlan(plan, completedScreens) {
     })
   })
 
+  // Add originality assessments with data
+  if (plan.originalityProjects) {
+    plan.originalityProjects.forEach((project, index) => {
+      const id = `originality_${index + 1}`
+      items.push({
+        id,
+        screenType: 'originality',
+        text: `Originality: ${project.repo}`,
+        status: completedScreens.has(id) ? 'completed' : 'pending',
+        data: { targetProject: project }
+      })
+    })
+  }
+
   // Add completion
   const allRequiredCompleted = items.every(item => completedScreens.has(item.id))
   items.push({
@@ -250,27 +269,30 @@ async function handleCompleteScreen(userAddress, screenId, data, kv) {
   if (screenId === 'range_definition') {
     const existingPlan = await kv.get(`user:${userAddress}:evaluation-plan`)
     if (!existingPlan) {
-      const { getRandomProject, getRandomPair, getDiversePair } = await import('@/lib/eloDataset')
-      
-      // Generate evaluation plan: 2 similar projects, 10 comparisons
+      const { getRandomProject, getRandomPair, getDiversePair, getRandomProjectsForOriginality } = await import('@/lib/eloHelpers')
+
+      // Generate evaluation plan: 2 similar projects, 10 comparisons, 3 originality
       const similarProjects = [
         getRandomProject(),
         getRandomProject()
       ]
-      
+
       const comparisons = []
       for (let i = 0; i < 10; i++) {
         const pair = i % 2 === 0 ? getRandomPair() : getDiversePair()
         comparisons.push(pair)
       }
-      
+
+      const originalityProjects = getRandomProjectsForOriginality(3)
+
       const plan = {
         similarProjects,
         comparisons,
+        originalityProjects,
         planGenerated: new Date().toISOString(),
         userAddress
       }
-      
+
       // Save the generated plan
       await kv.put(`user:${userAddress}:evaluation-plan`, JSON.stringify(plan))
       console.log('Generated full evaluation plan after range_definition for user:', userAddress)
@@ -328,5 +350,6 @@ function getScreenTypeFromId(screenId) {
   if (screenId === 'range_definition') return 'personal_scale'
   if (screenId.startsWith('similar_projects')) return 'similar_projects'
   if (screenId.startsWith('comparison')) return 'comparison'
+  if (screenId.startsWith('originality')) return 'originality'
   return screenId
 }

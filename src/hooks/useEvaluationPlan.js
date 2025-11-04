@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { getRandomProject, getRandomPair, getDiversePair } from '@/lib/eloDataset'
+import { getRandomProject, getRandomPair, getDiversePair, getRandomProjectsForOriginality } from '@/lib/eloHelpers'
 
 export function useEvaluationPlan(userAddress) {
   const [plan, setPlan] = useState(null)
@@ -8,34 +8,40 @@ export function useEvaluationPlan(userAddress) {
   // Generate a complete evaluation plan
   const generatePlan = useCallback(() => {
     console.log('🎯 Generating evaluation plan...')
-    
+
     // 2 Similar Projects
     const similarProjects = [
       getRandomProject(),
       getRandomProject()
     ]
-    
+
     // 10 Comparisons - mix random and diverse pairs for variety
     const comparisons = []
     for (let i = 0; i < 10; i++) {
       const pair = i % 2 === 0 ? getRandomPair() : getDiversePair()
       comparisons.push(pair)
     }
-    
+
+    // 3 Originality assessments - random projects
+    const originalityProjects = getRandomProjectsForOriginality(3)
+
     const newPlan = {
       similarProjects,
       comparisons,
+      originalityProjects,
       planGenerated: new Date().toISOString(),
       userAddress
     }
-    
+
     console.log('✅ Plan generated:', {
       similarCount: similarProjects.length,
       comparisonCount: comparisons.length,
+      originalityCount: originalityProjects.length,
       similarProjects: similarProjects.map(p => p.repo),
-      comparisons: comparisons.map(pair => `${pair[0].repo} vs ${pair[1].repo}`)
+      comparisons: comparisons.map(pair => `${pair[0].repo} vs ${pair[1].repo}`),
+      originalityProjects: originalityProjects.map(p => p.repo)
     })
-    
+
     setPlan(newPlan)
     savePlanToKV(newPlan)
     return newPlan
@@ -131,11 +137,26 @@ export function useEvaluationPlan(userAddress) {
         id,
         screenType: 'comparison',
         text: `Comparison: ${pair[0].repo} vs ${pair[1].repo}`,
-        status: completedScreens.has(id) ? 'completed' : 
+        status: completedScreens.has(id) ? 'completed' :
                 shouldBeCurrentScreen(id, completedScreens, items) ? 'current' : 'pending',
         data: { projectPair: pair }
       })
     })
+
+    // Add originality assessments with actual names and data
+    if (planData.originalityProjects) {
+      planData.originalityProjects.forEach((project, index) => {
+        const id = `originality_${index + 1}`
+        items.push({
+          id,
+          screenType: 'originality',
+          text: `Originality: ${project.repo}`,
+          status: completedScreens.has(id) ? 'completed' :
+                  shouldBeCurrentScreen(id, completedScreens, items) ? 'current' : 'pending',
+          data: { targetProject: project }
+        })
+      })
+    }
 
     // Add completion
     items.push({
@@ -180,6 +201,13 @@ function allScreensCompleted(completedScreens, plan) {
     ...plan.similarProjects.map((_, i) => `similar_projects_${i + 1}`),
     ...plan.comparisons.map((_, i) => `comparison_${i + 1}`)
   ]
-  
+
+  // Add originality screens if they exist in the plan
+  if (plan.originalityProjects) {
+    requiredScreens.push(
+      ...plan.originalityProjects.map((_, i) => `originality_${i + 1}`)
+    )
+  }
+
   return requiredScreens.every(screenId => completedScreens.has(screenId))
 }

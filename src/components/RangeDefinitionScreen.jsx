@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useAutosave, useDataSubmission } from '@/hooks/useAutoSave'
-import { getAllProjects, formatRepoName } from '@/lib/eloDataset'
+import { getAllProjects, formatRepoName } from '@/lib/eloHelpers'
 
 export function RangeDefinitionScreen({ onNext, onBack }) {
   const { user } = useAuth()

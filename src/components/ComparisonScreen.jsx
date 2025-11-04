@@ -8,7 +8,7 @@ import {
   getDiversePair,
   getFundingPercentage,
   formatRepoName
-} from '@/lib/eloDataset'
+} from '@/lib/eloHelpers'
 
 export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBack, onProjectChange }) {
   const { user } = useAuth()

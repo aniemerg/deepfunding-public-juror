@@ -153,6 +153,16 @@ function getScreenIdFromDataType(dataType, id, payload) {
       // Parse comparison number from id (e.g., "comparison-3" -> "comparison_3")
       const comparisonNumber = parseInt(id.split('-')[1]) || 1;
       return `comparison_${comparisonNumber}`
+    case 'originality':
+      // Parse originality number from id (e.g., "originality-ethereum-go-ethereum" -> extract number from pattern)
+      // Since id format is "originality-{repo-slug}", we need to find which originality screen this is
+      // For now, we'll extract a number if present, or default to extracting from the id pattern
+      const match = id.match(/originality-(\d+)/);
+      if (match) {
+        return `originality_${match[1]}`;
+      }
+      // Fallback: just return originality with some identifier
+      return id.replace(/-/g, '_');
     default:
       return null
   }

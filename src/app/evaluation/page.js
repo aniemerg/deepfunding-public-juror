@@ -6,6 +6,7 @@ import { BackgroundScreen } from '@/components/BackgroundScreen'
 import { RangeDefinitionScreen } from '@/components/RangeDefinitionScreen'
 import { SimilarProjectsScreen } from '@/components/SimilarProjectsScreen'
 import { ComparisonScreen } from '@/components/ComparisonScreen'
+import { OriginalityScreen } from '@/components/OriginalityScreen'
 import { NavigationSidebar } from '@/components/NavigationSidebar'
 import { useServerNavigationState } from '@/hooks/useServerNavigationState'
 
@@ -155,6 +156,15 @@ export default function EvaluationPage() {
           <ComparisonScreen
             key={navigationState.currentScreen}
             projectPair={currentNavItem.data?.projectPair}
+            onNext={handleNext}
+            onBack={handleBack}
+          />
+        )
+      case 'originality':
+        return (
+          <OriginalityScreen
+            key={navigationState.currentScreen}
+            targetProject={currentNavItem.data?.targetProject}
             onNext={handleNext}
             onBack={handleBack}
           />

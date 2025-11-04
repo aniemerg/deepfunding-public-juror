@@ -9,7 +9,7 @@ import {
   getSimilarProjects,
   formatRepoName,
   getFundingPercentage 
-} from '@/lib/eloDataset'
+} from '@/lib/eloHelpers'
 
 export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onNext, onBack, onProjectChange }) {
   const { user } = useAuth()
