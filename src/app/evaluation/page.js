@@ -14,6 +14,7 @@ export default function EvaluationPage() {
   const { user, isLoggedIn, isLoading, logout } = useAuth()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isTransitioning, setIsTransitioning] = useState(false)
 
   // Debug logging - try multiple possible address fields
   const userAddress = user?.address || user?.ensName || user?.walletAddress
@@ -82,6 +83,7 @@ export default function EvaluationPage() {
   // Handle screen completion - data comes from the screen component
   const handleNext = async (screenData = {}) => {
     try {
+      setIsTransitioning(true)
       await completeScreen(navigationState.currentScreen, screenData)
     } catch (error) {
       // Use debug endpoint for logging since console.log doesn't work
@@ -93,6 +95,8 @@ export default function EvaluationPage() {
           data: { error: error.message, currentScreen: navigationState.currentScreen, screenData }
         })
       }).catch(() => {})
+    } finally {
+      setIsTransitioning(false)
     }
   }
 
@@ -253,6 +257,16 @@ export default function EvaluationPage() {
         </div>
       </div>
 
+      {/* Transition loading overlay */}
+      {isTransitioning && (
+        <div className="transition-overlay">
+          <div className="transition-content">
+            <div className="spinner"></div>
+            <p className="transition-message">Saving your submission...</p>
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
         .hamburger-button {
           display: none;
@@ -264,9 +278,61 @@ export default function EvaluationPage() {
           color: #333;
         }
 
+        .transition-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(0, 0, 0, 0.7);
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .transition-content {
+          background: white;
+          padding: 40px 60px;
+          border-radius: 12px;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+          text-align: center;
+        }
+
+        .spinner {
+          width: 50px;
+          height: 50px;
+          border: 4px solid #f3f3f3;
+          border-top: 4px solid #3498db;
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+          margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+        .transition-message {
+          font-size: 18px;
+          color: #333;
+          margin: 0;
+          font-weight: 500;
+        }
+
         @media (max-width: 768px) {
           .hamburger-button {
             display: block;
+          }
+
+          .transition-content {
+            padding: 30px 40px;
+            margin: 20px;
+          }
+
+          .transition-message {
+            font-size: 16px;
           }
         }
       `}</style>

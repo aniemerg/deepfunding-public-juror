@@ -77,13 +77,16 @@ function parseArgs() {
 }
 
 // Execute wrangler command and return output
-function execWrangler(command, env = 'preview') {
+function execWrangler(command, env = 'preview', useLocal = false) {
   const namespaceId = KV_NAMESPACES[env === 'preview' ? 'preview' : 'production'];
-  const previewFlag = env === 'preview' ? '--preview' : '';
+
+  // When using --local, don't specify --preview or --remote flags
+  // Local storage is persisted per namespace-id, not per environment
+  const storageFlag = useLocal ? '--local' : (env === 'preview' ? '--preview --remote' : '--remote');
 
   try {
     const output = execSync(
-      `wrangler kv key ${command} --namespace-id=${namespaceId} ${previewFlag} --remote`,
+      `wrangler kv key ${command} --namespace-id=${namespaceId} ${storageFlag}`,
       { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
     );
     return output.trim();
@@ -97,10 +100,10 @@ function execWrangler(command, env = 'preview') {
 }
 
 // Get user profile from KV (contains ENS name)
-function getUserProfile(address, env = 'preview') {
+function getUserProfile(address, env = 'preview', useLocal = false) {
   const profileKey = `user:${address.toLowerCase()}:profile`;
   try {
-    const value = getKeyValue(profileKey, env);
+    const value = getKeyValue(profileKey, env, useLocal);
     return value;
   } catch (err) {
     return null;
@@ -108,7 +111,7 @@ function getUserProfile(address, env = 'preview') {
 }
 
 // Resolve ENS name to address - check reverse mapping first for speed
-function resolveENS(ensNameOrAddress, env = 'preview') {
+function resolveENS(ensNameOrAddress, env = 'preview', useLocal = false) {
   // If it looks like an address, return it
   if (ensNameOrAddress.startsWith('0x')) {
     return ensNameOrAddress.toLowerCase();
@@ -116,17 +119,17 @@ function resolveENS(ensNameOrAddress, env = 'preview') {
 
   // Try fast lookup via reverse mapping (ens:{name} → address)
   const ensLookupKey = `ens:${ensNameOrAddress}`;
-  const ensMapping = getKeyValue(ensLookupKey, env);
+  const ensMapping = getKeyValue(ensLookupKey, env, useLocal);
   if (ensMapping && ensMapping.address) {
     return ensMapping.address.toLowerCase();
   }
 
   // Fallback: scan all profiles (for backwards compatibility with old data)
-  const allKeys = getAllKeys(env);
+  const allKeys = getAllKeys(env, useLocal);
   const profileKeys = allKeys.filter(k => k.includes(':profile'));
 
   for (const key of profileKeys) {
-    const profile = getKeyValue(key, env);
+    const profile = getKeyValue(key, env, useLocal);
     if (profile && profile.ensName === ensNameOrAddress) {
       return profile.address.toLowerCase();
     }
@@ -137,15 +140,15 @@ function resolveENS(ensNameOrAddress, env = 'preview') {
 }
 
 // Get ENS name from KV (no RPC calls)
-function getENSFromKV(address, env = 'preview') {
-  const profile = getUserProfile(address, env);
+function getENSFromKV(address, env = 'preview', useLocal = false) {
+  const profile = getUserProfile(address, env, useLocal);
   return profile?.ensName || null;
 }
 
 // Get all keys from KV
-function getAllKeys(env = 'preview') {
+function getAllKeys(env = 'preview', useLocal = false) {
   try {
-    const output = execWrangler('list', env);
+    const output = execWrangler('list', env, useLocal);
     if (!output) return [];
 
     const keys = JSON.parse(output);
@@ -157,9 +160,9 @@ function getAllKeys(env = 'preview') {
 }
 
 // Get value for a specific key
-function getKeyValue(key, env = 'preview') {
+function getKeyValue(key, env = 'preview', useLocal = false) {
   try {
-    const output = execWrangler(`get "${key}"`, env);
+    const output = execWrangler(`get "${key}"`, env, useLocal);
     try {
       return JSON.parse(output);
     } catch {
@@ -171,9 +174,9 @@ function getKeyValue(key, env = 'preview') {
 }
 
 // Delete a specific key
-function deleteKey(key, env = 'preview') {
+function deleteKey(key, env = 'preview', useLocal = false) {
   try {
-    execWrangler(`delete "${key}"`, env);
+    execWrangler(`delete "${key}"`, env, useLocal);
     return true;
   } catch (err) {
     error(`Failed to delete key ${key}: ${err.message}`);
@@ -215,10 +218,11 @@ function extractUsers(keys) {
 }
 
 // Command: list - Show all users
-function cmdList(env) {
-  info(`\nListing users in KV (${env})...\n`);
+function cmdList(env, useLocal = false) {
+  const storageType = useLocal ? 'local' : 'remote';
+  info(`\nListing users in ${storageType} KV (${env})...\n`);
 
-  const keys = getAllKeys(env);
+  const keys = getAllKeys(env, useLocal);
   const users = extractUsers(keys);
 
   if (users.size === 0) {
@@ -230,7 +234,7 @@ function cmdList(env) {
 
   for (const [address, userKeys] of users) {
     // Get ENS name from KV (fast, only reads profile key)
-    const ensName = getENSFromKV(address, env);
+    const ensName = getENSFromKV(address, env, useLocal);
     const displayName = ensName ? `${ensName} (${address.slice(0, 10)}...)` : address;
 
     // Count keys by type for quick summary
@@ -247,18 +251,19 @@ function cmdList(env) {
 }
 
 // Command: inspect - View user data
-function cmdInspect(user, env, verbose = false) {
-  info(`\nInspecting data for ${user} (${env})...\n`);
+function cmdInspect(user, env, verbose = false, useLocal = false) {
+  const storageType = useLocal ? 'local' : 'remote';
+  info(`\nInspecting data for ${user} in ${storageType} KV (${env})...\n`);
 
   // Resolve ENS to address (from KV or assume it's an address)
-  const address = resolveENS(user, env);
-  const ensName = getENSFromKV(address, env);
+  const address = resolveENS(user, env, useLocal);
+  const ensName = getENSFromKV(address, env, useLocal);
   const displayName = ensName ? `${ensName} (${address})` : address;
 
   log(`User: ${displayName}\n`);
 
   // Get all keys for this user
-  const allKeys = getAllKeys(env);
+  const allKeys = getAllKeys(env, useLocal);
   const userKeys = allKeys.filter(key => key.startsWith(`user:${address}:`));
 
   if (userKeys.length === 0) {
@@ -278,7 +283,7 @@ function cmdInspect(user, env, verbose = false) {
   // Parse and categorize data
   const navigation = userKeys.find(k => k.includes(':navigation:'));
   if (navigation) {
-    const navData = getKeyValue(navigation, env);
+    const navData = getKeyValue(navigation, env, useLocal);
     if (navData) {
       log('Navigation State:', colors.bright);
       log(`  Current Screen: ${navData.currentScreen || 'unknown'}`);
@@ -293,7 +298,7 @@ function cmdInspect(user, env, verbose = false) {
   log('Recent Data:', colors.bright);
   const dataKeys = userKeys.filter(k => k.includes(':data'));
   for (const key of dataKeys.slice(0, 5)) {
-    const value = getKeyValue(key, env);
+    const value = getKeyValue(key, env, useLocal);
     if (value) {
       const screenName = key.split(':')[2];
       if (value.submittedAt) {
@@ -316,7 +321,7 @@ function cmdInspect(user, env, verbose = false) {
 
     for (const key of userKeys) {
       log(`\n[${key}]`, colors.yellow);
-      const value = getKeyValue(key, env);
+      const value = getKeyValue(key, env, useLocal);
       log(JSON.stringify(value, null, 2));
     }
   }
@@ -325,16 +330,17 @@ function cmdInspect(user, env, verbose = false) {
 }
 
 // Command: export - Save user data to file
-function cmdExport(user, filename, env) {
-  info(`\nExporting data for ${user} to ${filename}...\n`);
+function cmdExport(user, filename, env, useLocal = false) {
+  const storageType = useLocal ? 'local' : 'remote';
+  info(`\nExporting data for ${user} from ${storageType} KV to ${filename}...\n`);
 
   // Resolve ENS to address (from KV or assume it's an address)
-  const address = resolveENS(user, env);
-  const ensName = getENSFromKV(address, env);
+  const address = resolveENS(user, env, useLocal);
+  const ensName = getENSFromKV(address, env, useLocal);
   log(`User: ${ensName || address}`);
 
   // Get all keys for this user
-  const allKeys = getAllKeys(env);
+  const allKeys = getAllKeys(env, useLocal);
   const userKeys = allKeys.filter(key => key.startsWith(`user:${address}:`));
 
   if (userKeys.length === 0) {
@@ -347,12 +353,13 @@ function cmdExport(user, filename, env) {
     user: user,
     address: address,
     environment: env,
+    storage: storageType,
     exportedAt: new Date().toISOString(),
     keys: {}
   };
 
   for (const key of userKeys) {
-    exportData.keys[key] = getKeyValue(key, env);
+    exportData.keys[key] = getKeyValue(key, env, useLocal);
   }
 
   // Write to file
@@ -361,17 +368,19 @@ function cmdExport(user, filename, env) {
 }
 
 // Command: clear - Delete all user data
-async function cmdClear(user, env) {
+async function cmdClear(user, env, useLocal = false) {
+  const storageType = useLocal ? 'local' : 'remote';
   warning(`\nAbout to delete ALL data for ${user}`);
+  log(`Storage: ${storageType}`);
   log(`Environment: ${env}\n`);
 
   // Resolve ENS to address (from KV or assume it's an address)
-  const address = resolveENS(user, env);
-  const ensName = getENSFromKV(address, env);
+  const address = resolveENS(user, env, useLocal);
+  const ensName = getENSFromKV(address, env, useLocal);
   log(`User: ${ensName || address}\n`);
 
   // Get all keys for this user
-  const allKeys = getAllKeys(env);
+  const allKeys = getAllKeys(env, useLocal);
   const userKeys = allKeys.filter(key => key.startsWith(`user:${address}:`));
 
   if (userKeys.length === 0) {
@@ -384,7 +393,7 @@ async function cmdClear(user, env) {
   log('');
 
   // Extra confirmation for production
-  if (env === 'production') {
+  if (env === 'production' && !useLocal) {
     error('WARNING: You are about to delete PRODUCTION data!');
     const confirm1 = await askConfirmation('Type "yes" to confirm production delete');
     if (!confirm1) {
@@ -402,7 +411,7 @@ async function cmdClear(user, env) {
   // Delete all keys
   let deleted = 0;
   for (const key of userKeys) {
-    if (deleteKey(key, env)) {
+    if (deleteKey(key, env, useLocal)) {
       deleted++;
     }
   }
@@ -507,30 +516,31 @@ async function cmdClearLocal() {
 function showHelp() {
   log('\nKV Manager - Development tool for managing Cloudflare KV data\n', colors.bright);
   log('Usage:', colors.cyan);
-  log('  kv-manager list [--env=preview|production]');
-  log('  kv-manager inspect <user> [--verbose] [--env=preview|production]');
-  log('  kv-manager export <user> <file> [--env=preview|production]');
-  log('  kv-manager clear <user> [--env=preview|production]');
+  log('  kv-manager list [--local] [--env=preview|production]');
+  log('  kv-manager inspect <user> [--verbose] [--local] [--env=preview|production]');
+  log('  kv-manager export <user> <file> [--local] [--env=preview|production]');
+  log('  kv-manager clear <user> [--local] [--env=preview|production]');
   log('  kv-manager clear-pattern <pattern> [--env=preview|production]');
   log('  kv-manager clear-local');
   log('\nCommands:', colors.cyan);
-  log('  list              List all users in remote KV');
+  log('  list              List all users');
   log('  inspect <user>    View data for a user (ENS name or address)');
   log('  export <user> <file>   Export user data to JSON file');
-  log('  clear <user>      Delete all data for a user from remote KV');
+  log('  clear <user>      Delete all data for a user');
   log('  clear-pattern <pattern>   Delete keys matching pattern from remote KV');
   log('  clear-local       Delete local development storage (.wrangler/state)');
   log('\nFlags:', colors.cyan);
-  log('  --env=preview     Use preview KV (default)');
-  log('  --env=production  Use production KV (requires extra confirmation)');
+  log('  --local           Use local KV storage (for "npm run preview")');
+  log('  --env=preview     Use preview KV namespace (default)');
+  log('  --env=production  Use production KV namespace (requires extra confirmation)');
   log('  --verbose         Show full data in inspect command');
   log('\nExamples:', colors.cyan);
-  log('  kv-manager list');
-  log('  kv-manager inspect vitalik.eth --verbose');
-  log('  kv-manager export alice.eth backup.json');
+  log('  kv-manager list --local                    # List users in local dev storage');
+  log('  kv-manager clear allanniemerg.eth --local  # Clear local dev data');
+  log('  kv-manager inspect vitalik.eth --verbose   # Inspect remote KV');
+  log('  kv-manager export alice.eth backup.json --local');
   log('  kv-manager clear vitalik.eth --env=production');
-  log('  kv-manager clear-pattern "user:0x742d:background:*"');
-  log('  kv-manager clear-local   # Clear local dev storage for npm run preview');
+  log('  kv-manager clear-local                     # Alternative to clear all local data');
   log('');
 }
 
@@ -544,6 +554,8 @@ async function main() {
   }
 
   const env = flags.env;
+  const useLocal = flags.local || false;
+
   if (!['preview', 'production'].includes(env)) {
     error('Invalid environment. Use --env=preview or --env=production');
     process.exit(1);
@@ -552,36 +564,36 @@ async function main() {
   try {
     switch (command) {
       case 'list':
-        cmdList(env);
+        cmdList(env, useLocal);
         break;
 
       case 'inspect':
         if (params.length < 1) {
-          error('Usage: kv-manager inspect <user> [--verbose]');
+          error('Usage: kv-manager inspect <user> [--verbose] [--local]');
           process.exit(1);
         }
-        cmdInspect(params[0], env, flags.verbose);
+        cmdInspect(params[0], env, flags.verbose, useLocal);
         break;
 
       case 'export':
         if (params.length < 2) {
-          error('Usage: kv-manager export <user> <file>');
+          error('Usage: kv-manager export <user> <file> [--local]');
           process.exit(1);
         }
-        cmdExport(params[0], params[1], env);
+        cmdExport(params[0], params[1], env, useLocal);
         break;
 
       case 'clear':
         if (params.length < 1) {
-          error('Usage: kv-manager clear <user>');
+          error('Usage: kv-manager clear <user> [--local]');
           process.exit(1);
         }
-        await cmdClear(params[0], env);
+        await cmdClear(params[0], env, useLocal);
         break;
 
       case 'clear-pattern':
         if (params.length < 1) {
-          error('Usage: kv-manager clear-pattern <pattern>');
+          error('Usage: kv-manager clear-pattern <pattern> [--local]');
           process.exit(1);
         }
         await cmdClearPattern(params[0], env);
