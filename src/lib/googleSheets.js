@@ -177,37 +177,39 @@ export async function submitPersonalScaleData(env, { ensName, mostValuableRepo, 
 }
 
 // Submit similar project data
-export async function submitSimilarProjectData(env, { ensName, screenNumber, targetRepo, selectedRepo, multiplier, reasoning }) {
+export async function submitSimilarProjectData(env, { ensName, screenNumber, targetRepo, selectedRepo, multiplier, reasoning, wasSkipped = false }) {
   const accessToken = await getAccessToken(env);
   const submissionId = generateSubmissionId();
   const sheetName = "SimilarProjects";
-  
+
   const values = [
     submissionId,
     1, // version
     ensName,
     new Date().toISOString(),
+    wasSkipped.toString(),
     screenNumber.toString(),
     targetRepo,
     selectedRepo,
     multiplier ? multiplier.toString() : '',
     reasoning || ''
   ];
-  
+
   return await appendToSheet(env, accessToken, sheetName, values);
 }
 
 // Submit comparison data
-export async function submitComparisonData(env, { ensName, comparisonNumber, repoA, repoB, winner, loser, multiplier, reasoning }) {
+export async function submitComparisonData(env, { ensName, comparisonNumber, repoA, repoB, winner, loser, multiplier, reasoning, wasSkipped = false }) {
   const accessToken = await getAccessToken(env);
   const submissionId = generateSubmissionId();
   const sheetName = "Comparisons";
-  
+
   const values = [
     submissionId,
     1, // version
     ensName,
     new Date().toISOString(),
+    wasSkipped.toString(),
     comparisonNumber.toString(),
     repoA,
     repoB,
@@ -216,26 +218,27 @@ export async function submitComparisonData(env, { ensName, comparisonNumber, rep
     multiplier.toString(),
     reasoning || ''
   ];
-  
+
   return await appendToSheet(env, accessToken, sheetName, values);
 }
 
 // Submit originality data
-export async function submitOriginalityData(env, { ensName, targetRepo, originalityPercentage, reasoning }) {
+export async function submitOriginalityData(env, { ensName, targetRepo, originalityPercentage, reasoning, wasSkipped = false }) {
   const accessToken = await getAccessToken(env);
   const submissionId = generateSubmissionId();
   const sheetName = "Originality";
-  
+
   const values = [
     submissionId,
     1, // version
     ensName,
     new Date().toISOString(),
+    wasSkipped.toString(),
     targetRepo,
     originalityPercentage.toString(),
     reasoning || ''
   ];
-  
+
   return await appendToSheet(env, accessToken, sheetName, values);
 }
 

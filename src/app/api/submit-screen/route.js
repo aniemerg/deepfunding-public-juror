@@ -55,7 +55,8 @@ export async function POST(req) {
           targetRepo: payload.targetProject,
           selectedRepo: payload.similarProject,
           multiplier: payload.similarMultiplier,
-          reasoning: payload.reasoning || ''
+          reasoning: payload.reasoning || '',
+          wasSkipped: payload.wasSkipped || false
         });
         break;
         
@@ -72,7 +73,8 @@ export async function POST(req) {
           winner: winner,
           loser: loser,
           multiplier: payload.multiplier,
-          reasoning: payload.reasoning || ''
+          reasoning: payload.reasoning || '',
+          wasSkipped: payload.wasSkipped || false
         });
         break;
         
@@ -81,7 +83,8 @@ export async function POST(req) {
           ensName,
           targetRepo: payload.targetRepo,
           originalityPercentage: payload.originalityPercentage,
-          reasoning: payload.reasoning
+          reasoning: payload.reasoning,
+          wasSkipped: payload.wasSkipped || false
         });
         break;
         
@@ -105,10 +108,11 @@ export async function POST(req) {
     if (screenId) {
       await kv.put(`user:${walletAddress}:completed:${screenId}`, JSON.stringify({
         completed: true,
+        wasSkipped: payload.wasSkipped || false,  // Track skip status
         timestamp: new Date().toISOString(),
         data: payload
       }));
-      
+
       // Clear navigation cache so it will be re-derived
       await kv.delete(`user:${walletAddress}:navigation-state`);
     }

@@ -20,7 +20,7 @@ export default function EvaluationPage() {
   const userAddress = user?.address || user?.ensName || user?.walletAddress
   console.log('EvaluationPage: Auth state:', { user, isLoggedIn, isLoading, userAddress })
 
-  const { state: navigationState, loading: navigationLoading, error: navigationError, completeScreen, navigateToScreen } = useServerNavigationState(userAddress)
+  const { state: navigationState, loading: navigationLoading, error: navigationError, completeScreen, navigateToScreen, refreshState } = useServerNavigationState(userAddress)
 
 
   useEffect(() => {
@@ -81,9 +81,13 @@ export default function EvaluationPage() {
   }
 
   // Handle screen completion - data comes from the screen component
+  // NOTE: handleNext is called AFTER screen components have already submitted via submitScreen()
+  // completeScreen() handles plan generation and navigation state updates
+  // handleCompleteScreen() now preserves wasSkipped flag from existing completion records
   const handleNext = async (screenData = {}) => {
     try {
       setIsTransitioning(true)
+      // Call completeScreen to trigger plan generation and navigation updates
       await completeScreen(navigationState.currentScreen, screenData)
     } catch (error) {
       // Use debug endpoint for logging since console.log doesn't work
@@ -140,7 +144,7 @@ export default function EvaluationPage() {
       )
     }
 
-    const isCompleted = currentNavItem.status === 'completed'
+    const isCompleted = currentNavItem.status === 'completed' || currentNavItem.status === 'skipped'
     const currentIndex = navigationState.navigationItems.findIndex(item => item.id === navigationState.currentScreen)
     const hasNext = currentIndex < navigationState.navigationItems.length - 1
 

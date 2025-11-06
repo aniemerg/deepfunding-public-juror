@@ -8,6 +8,7 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
   const { user } = useAuth()
   const [originality, setOriginality] = useState(80)
   const [reasoning, setReasoning] = useState('')
+  const [wasSkipped, setWasSkipped] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastSubmittedAt, setLastSubmittedAt] = useState(null)
   const [error, setError] = useState(null)
@@ -19,6 +20,7 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
     targetRepo: targetProject?.repo || '',
     originalityPercentage: originality,
     reasoning: reasoning,
+    wasSkipped,
     assessmentTimestamp: new Date().toISOString()
   }
 
@@ -38,6 +40,7 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
       if (submission.exists && submission.data) {
         setOriginality(submission.data.originalityPercentage || 50)
         setReasoning(submission.data.reasoning || '')
+        setWasSkipped(submission.data.wasSkipped || false)
         setLastSubmittedAt(submission.data.assessmentTimestamp)
       }
     } catch (error) {
@@ -81,7 +84,7 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (originality === '' || isNaN(originality)) {
+    if (!wasSkipped && (originality === '' || isNaN(originality))) {
       setError('Please provide an originality percentage')
       return
     }
@@ -110,6 +113,48 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
       setError('Failed to submit assessment. Please try again.')
       setIsSubmitting(false)
     }
+  }
+
+  const handleSkip = async () => {
+    setWasSkipped(true)
+    setOriginality(80)  // Reset to default
+    setReasoning('')
+
+    // Wait for state to update, then submit
+    setTimeout(async () => {
+      setIsSubmitting(true)
+      setError(null)
+
+      const skipData = {
+        targetRepo: targetProject?.repo || '',
+        originalityPercentage: 80,
+        reasoning: '',
+        wasSkipped: true,
+        assessmentTimestamp: new Date().toISOString()
+      }
+
+      try {
+        await submitScreen(user.address, screenType, screenId, skipData)
+        setLastSubmittedAt(new Date().toISOString())
+
+        // Auto-dismiss the success toast after 3 seconds
+        setTimeout(() => {
+          setLastSubmittedAt(null)
+        }, 3000)
+
+        // After brief success display, move to next screen
+        setTimeout(() => {
+          if (onNext) {
+            onNext()
+          }
+          setIsSubmitting(false)
+        }, 1500)
+      } catch (error) {
+        console.error('Skip submission failed:', error)
+        setError('Failed to skip assessment. Please try again.')
+        setIsSubmitting(false)
+      }
+    }, 0)
   }
 
   if (!targetProject) {
@@ -213,7 +258,7 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
 
           {lastSubmittedAt && !error && (
             <div className="submission-status">
-              ✓ Assessment recorded
+              ✓ {wasSkipped ? 'Skipped' : 'Assessment recorded'}
             </div>
           )}
 
@@ -226,23 +271,37 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
             >
               ← Back
             </button>
-            {isCompleted && onForward ? (
-              <button
-                type="button"
-                onClick={onForward}
-                className="nav-button continue-button"
-              >
-                Continue →
-              </button>
-            ) : (
-              <button
-                type="submit"
-                className="nav-button continue-button"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Submitting...' : 'Submit Assessment'}
-              </button>
-            )}
+
+            <div className="right-buttons">
+              {!isCompleted && (
+                <button
+                  type="button"
+                  onClick={handleSkip}
+                  className="skip-button"
+                  disabled={isSubmitting}
+                >
+                  Skip this step
+                </button>
+              )}
+
+              {isCompleted && onForward ? (
+                <button
+                  type="button"
+                  onClick={onForward}
+                  className="nav-button continue-button"
+                >
+                  Continue →
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="nav-button continue-button"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Assessment'}
+                </button>
+              )}
+            </div>
           </form>
         </div>
       </div>
@@ -547,7 +606,28 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
           background-color: #2c5282;
         }
 
-        .nav-button:disabled {
+        .right-buttons {
+          display: flex;
+          gap: 1rem;
+          align-items: center;
+        }
+
+        .skip-button {
+          background: none;
+          border: none;
+          color: #718096;
+          text-decoration: underline;
+          cursor: pointer;
+          font-size: 0.9rem;
+          padding: 0.5rem;
+        }
+
+        .skip-button:hover:not(:disabled) {
+          color: #4a5568;
+        }
+
+        .nav-button:disabled,
+        .skip-button:disabled {
           opacity: 0.5;
           cursor: not-allowed;
         }
