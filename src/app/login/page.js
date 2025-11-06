@@ -35,70 +35,28 @@ export default function LoginPage() {
     setCheckingEns(true)
     setError('')
     console.log('Checking ENS for address:', walletAddress)
-    
+
     try {
-      // Try a simpler approach using a public ENS API first
-      console.log('Fetching from:', `https://api.ensideas.com/ens/resolve/${walletAddress}`)
-      const ensApiResponse = await fetch(`https://api.ensideas.com/ens/resolve/${walletAddress}`);
-      console.log('API response status:', ensApiResponse.status, ensApiResponse.ok)
-      
-      if (ensApiResponse.ok) {
-        const ensData = await ensApiResponse.json();
-        console.log('ENS API response:', ensData)
-        if (ensData.name && ensData.name.endsWith('.eth')) {
-          console.log('Found ENS via API:', ensData.name)
-          setEnsName(ensData.name);
-          return;
-        } else {
-          console.log('ENS data invalid:', ensData)
-        }
-      } else {
-        console.log('API request failed:', ensApiResponse.status, await ensApiResponse.text())
+      // Use our server-side proxy to resolve ENS
+      // This bypasses CORS and mobile browser restrictions
+      console.log('Fetching from server proxy:', `/api/resolve-ens?address=${walletAddress}`)
+      const response = await fetch(`/api/resolve-ens?address=${walletAddress}`);
+      console.log('Server response status:', response.status, response.ok)
+
+      const data = await response.json();
+      console.log('Server response:', data)
+
+      if (data.success && data.name && data.name.endsWith('.eth')) {
+        console.log('Found ENS via server:', data.name)
+        setEnsName(data.name);
+        return;
       }
-      
-      // Fallback to direct RPC call
-      console.log('Trying direct RPC call...')
-      const response = await fetch('https://rpc.ankr.com/eth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'eth_call',
-          params: [{
-            to: '0x3671aE578E63FdF66ad4F3E12CC0c0d71Ac7510C',
-            data: `0x691f3431000000000000000000000000${walletAddress.slice(2).toLowerCase()}`
-          }, 'latest'],
-          id: 1
-        })
-      });
-      
-      const result = await response.json();
-      console.log('RPC response:', result)
-      
-      if (result.result && result.result !== '0x') {
-        const hexData = result.result.slice(2);
-        console.log('Hex data length:', hexData.length)
-        if (hexData.length > 128) {
-          const nameLength = parseInt(hexData.slice(126, 128) + hexData.slice(124, 126), 16);
-          console.log('Name length:', nameLength)
-          if (nameLength > 0) {
-            const nameHex = hexData.slice(128, 128 + nameLength * 2);
-            const resolvedEnsName = Buffer.from(nameHex, 'hex').toString('utf8');
-            console.log('Resolved ENS name:', resolvedEnsName)
-            
-            if (resolvedEnsName.endsWith('.eth') && resolvedEnsName.length > 4) {
-              setEnsName(resolvedEnsName);
-              return;
-            }
-          }
-        }
-      }
-      
+
       // No ENS found
       console.log('No ENS found for address:', walletAddress)
       setEnsName('');
       setError(`This wallet address (${walletAddress}) does not have an ENS name. An ENS name ending in .eth is required to participate.`);
-      
+
     } catch (err) {
       console.error('ENS check failed:', err);
       setError('Failed to check ENS name. Please try again.');

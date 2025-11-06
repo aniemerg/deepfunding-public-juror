@@ -80,9 +80,20 @@ export function useAuth() {
       })
 
       const data = await response.json()
-      
+
       if (!response.ok) {
-        throw new Error(data.error || 'Authentication failed')
+        // Include detailed error information if available
+        let errorMessage = data.error || 'Authentication failed'
+        if (data.details) {
+          if (typeof data.details === 'string') {
+            errorMessage += ': ' + data.details
+          } else if (data.details.message) {
+            errorMessage += ': ' + data.details.message
+          } else {
+            errorMessage += ': ' + JSON.stringify(data.details)
+          }
+        }
+        throw new Error(errorMessage)
       }
 
       setUser(data.user)

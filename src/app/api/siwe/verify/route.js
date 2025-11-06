@@ -7,6 +7,8 @@ import { sessionOptions } from '@/lib/session'
 import { SiweMessage } from 'siwe'
 import { submitSessionData } from '@/lib/googleSheets'
 import { getCloudflareContext } from "@opennextjs/cloudflare"
+import { createPublicClient, http } from 'viem'
+import { mainnet, base } from 'viem/chains'
 
 // ENS Resolution function
 async function resolveENSName(address) {
@@ -39,28 +41,92 @@ export async function POST(req) {
 
   try {
     const siwe = new SiweMessage(message)
-    
+
     // Verify SIWE signature
     const headersList = await headers()
     const hostHeader = headersList.get('host') || ''
-    
-    // Check for domain mismatch and clear session if needed (development only)
-    if (process.env.NODE_ENV === 'development' && siwe.domain !== hostHeader) {
-      console.log(`Domain mismatch detected: message=${siwe.domain}, server=${hostHeader}. Clearing session.`)
-      session.siweNonce = null
-      await session.save()
-      return NextResponse.json({ error: 'Domain mismatch. Please refresh and try again.' }, { status: 400 })
-    }
-    
-    const result = await siwe.verify({
-      signature,
-      domain: hostHeader, // Use current server host
+
+    // Log all verification details for debugging
+    console.log('🔐 SIWE Verification Debug:', {
+      messageDomain: siwe.domain,
+      serverHost: hostHeader,
+      address: siwe.address,
       nonce: session.siweNonce,
-      time: new Date().toISOString(),
+      hasSignature: !!signature
     })
 
-    if (!result.success) {
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+    // Check for domain mismatch
+    if (siwe.domain !== hostHeader) {
+      console.log(`⚠️ Domain mismatch: message=${siwe.domain}, server=${hostHeader}`)
+
+      // In development, clear session and ask to retry
+      if (process.env.NODE_ENV === 'development') {
+        session.siweNonce = null
+        await session.save()
+        return NextResponse.json({ error: 'Domain mismatch. Please refresh and try again.' }, { status: 400 })
+      }
+
+      // In production, return detailed error for debugging
+      return NextResponse.json({
+        error: 'Domain mismatch',
+        details: {
+          expectedDomain: hostHeader,
+          receivedDomain: siwe.domain,
+          message: 'The signed message domain does not match the server domain. This may be caused by using a mobile browser or wallet that modifies the domain.'
+        }
+      }, { status: 400 })
+    }
+
+    // Validate nonce matches
+    if (siwe.nonce !== session.siweNonce) {
+      console.log('❌ Nonce mismatch')
+      return NextResponse.json({
+        error: 'Invalid nonce',
+        details: 'Session nonce does not match. Please try signing in again.'
+      }, { status: 401 })
+    }
+
+    // Validate message hasn't expired
+    const now = new Date()
+    if (siwe.expirationTime && new Date(siwe.expirationTime) < now) {
+      console.log('❌ Message expired')
+      return NextResponse.json({
+        error: 'Message expired',
+        details: 'The signed message has expired. Please try signing in again.'
+      }, { status: 401 })
+    }
+
+    // Verify signature using viem (supports both EOA and smart wallets via ERC-1271/ERC-6492)
+    try {
+      // Select chain based on chainId from SIWE message
+      const chain = siwe.chainId === 8453 ? base : mainnet
+      const client = createPublicClient({
+        chain,
+        transport: http()
+      })
+
+      // Verify the signature - viem handles both EOA and smart wallet signatures
+      const isValid = await client.verifyMessage({
+        address: siwe.address,
+        message: message,
+        signature: signature
+      })
+
+      if (!isValid) {
+        console.log('❌ Signature verification failed')
+        return NextResponse.json({
+          error: 'Invalid signature',
+          details: 'Signature verification failed. Please try signing in again.'
+        }, { status: 401 })
+      }
+
+      console.log('✅ Signature verified successfully for:', siwe.address)
+    } catch (verifyError) {
+      console.error('❌ Verification error:', verifyError)
+      return NextResponse.json({
+        error: 'Verification failed',
+        details: verifyError.message || 'Failed to verify signature. Please try again.'
+      }, { status: 401 })
     }
 
     // Resolve ENS name - REQUIRED for login
