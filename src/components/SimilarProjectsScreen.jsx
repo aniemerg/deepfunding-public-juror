@@ -227,62 +227,79 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
                     onClick={() => handleSuggestionClick(suggestion)}
                     disabled={isSubmitting}
                   >
-                    <a
-                      href={`https://github.com/${suggestion.repo}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="suggestion-repo"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {suggestion.repo}
-                    </a>
+                    <div className="button-content">
+                      <span className="project-name-text">{suggestion.repo}</span>
+                      <a
+                        href={`https://github.com/${suggestion.repo}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="github-link"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        View on GitHub →
+                      </a>
+                    </div>
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          {selectedProject && selectedProject !== 'None' && (
-            <div className="form-group">
-              <label htmlFor="multiplier">
-                How many times more valuable is{' '}
-                <a
-                  href={`https://github.com/${selectedProject}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="repo-link-inline"
-                >
-                  {formatRepoName(selectedProject)}
-                </a>
-                {' '}compared to{' '}
-                <a
-                  href={`https://github.com/${targetProject.repo}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="repo-link-inline"
-                >
-                  {formatRepoName(targetProject.repo)}
-                </a>?
-              </label>
-              <div className="multiplier-container">
-                <input
-                  id="multiplier"
-                  type="number"
-                  value={multiplier}
-                  onChange={(e) => setMultiplier(e.target.value)}
-                  placeholder="1.0"
-                  min="1.0"
-                  max="2.0"
-                  step="0.1"
-                  className="multiplier-input"
-                  disabled={isSubmitting}
-                />
-                <span className="multiplier-hint">
-                  (1.0 = equally valuable, 2.0 = twice as valuable)
-                </span>
-              </div>
+          <div className="form-group">
+            <label htmlFor="multiplier">
+              {selectedProject && selectedProject !== 'None' ? (
+                <>
+                  How many times more valuable is{' '}
+                  <a
+                    href={`https://github.com/${selectedProject}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="repo-link-inline"
+                  >
+                    {formatRepoName(selectedProject)}
+                  </a>
+                  {' '}compared to{' '}
+                  <a
+                    href={`https://github.com/${targetProject.repo}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="repo-link-inline"
+                  >
+                    {formatRepoName(targetProject.repo)}
+                  </a>?
+                </>
+              ) : (
+                <>
+                  Select a project to compare with{' '}
+                  <a
+                    href={`https://github.com/${targetProject.repo}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="repo-link-inline"
+                  >
+                    {formatRepoName(targetProject.repo)}
+                  </a>
+                </>
+              )}
+            </label>
+            <div className="multiplier-container">
+              <input
+                id="multiplier"
+                type="number"
+                value={multiplier}
+                onChange={(e) => setMultiplier(e.target.value)}
+                placeholder="1.0"
+                min="1.0"
+                max="2.0"
+                step="0.1"
+                className="multiplier-input"
+                disabled={isSubmitting || !selectedProject || selectedProject === 'None'}
+              />
+              <span className="multiplier-hint">
+                (1.0 = equally valuable, 2.0 = twice as valuable)
+              </span>
             </div>
-          )}
+          </div>
 
           <div className="reasoning-section">
             <label htmlFor="reasoning" className="reasoning-label">
@@ -514,16 +531,32 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
           cursor: not-allowed;
         }
 
-        .suggestion-repo {
-          font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
-          font-size: 0.9rem;
-          color: #2d3748;
-          text-decoration: none;
-          transition: color 0.2s;
-          display: block;
+        .button-content {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+          align-items: flex-start;
+          width: 100%;
         }
 
-        .suggestion-repo:hover {
+        .project-name-text {
+          font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+          font-size: 0.95rem;
+          color: #2d3748;
+          font-weight: 600;
+        }
+
+        .github-link {
+          font-size: 0.8rem;
+          color: #64748b;
+          text-decoration: none;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          gap: 0.25rem;
+        }
+
+        .github-link:hover {
           color: #3182ce;
           text-decoration: underline;
         }

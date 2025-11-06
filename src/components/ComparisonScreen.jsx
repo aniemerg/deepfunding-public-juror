@@ -182,15 +182,18 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
               onClick={() => handleProjectSelect(projectA.repo)}
               disabled={isSubmitting}
             >
-              <a
-                href={`https://github.com/${projectA.repo}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="project-name"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {projectA.repo}
-              </a>
+              <div className="card-content">
+                <span className="project-name">{projectA.repo}</span>
+                <a
+                  href={`https://github.com/${projectA.repo}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="github-link"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  View on GitHub →
+                </a>
+              </div>
             </button>
 
             <div className="vs-divider">VS</div>
@@ -200,61 +203,87 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
               onClick={() => handleProjectSelect(projectB.repo)}
               disabled={isSubmitting}
             >
-              <a
-                href={`https://github.com/${projectB.repo}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="project-name"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {projectB.repo}
-              </a>
+              <div className="card-content">
+                <span className="project-name">{projectB.repo}</span>
+                <a
+                  href={`https://github.com/${projectB.repo}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="github-link"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  View on GitHub →
+                </a>
+              </div>
             </button>
           </div>
 
-          {selectedWinner && (
-            <div className="multiplier-section">
-              <label htmlFor="multiplier">
-                How many times more valuable is{' '}
-                <a
-                  href={`https://github.com/${selectedWinner}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="repo-link"
-                >
-                  {formatRepoName(selectedWinner)}
-                </a>
-                {' '}compared to{' '}
-                <a
-                  href={`https://github.com/${selectedWinner === projectA.repo ? projectB.repo : projectA.repo}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="repo-link"
-                >
-                  {formatRepoName(selectedWinner === projectA.repo ? projectB.repo : projectA.repo)}
-                </a>?
-              </label>
-              <div className="multiplier-container">
-                <input
-                  id="multiplier"
-                  type="number"
-                  value={multiplier}
-                  onChange={(e) => setMultiplier(e.target.value)}
-                  placeholder="1.5"
-                  min="1"
-                  step="0.1"
-                  className="multiplier-input"
-                  disabled={isSubmitting}
-                />
-                <span className="multiplier-suffix">x</span>
-              </div>
-              <div className="multiplier-examples">
-                <span>1x = equal value</span>
-                <span>2x = twice as valuable</span>
-                <span>10x = ten times more valuable</span>
-              </div>
+          <div className="multiplier-section">
+            <label htmlFor="multiplier">
+              {selectedWinner ? (
+                <>
+                  How many times more valuable is{' '}
+                  <a
+                    href={`https://github.com/${selectedWinner}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="repo-link"
+                  >
+                    {formatRepoName(selectedWinner)}
+                  </a>
+                  {' '}compared to{' '}
+                  <a
+                    href={`https://github.com/${selectedWinner === projectA.repo ? projectB.repo : projectA.repo}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="repo-link"
+                  >
+                    {formatRepoName(selectedWinner === projectA.repo ? projectB.repo : projectA.repo)}
+                  </a>?
+                </>
+              ) : (
+                <>
+                  Select the more valuable project to compare{' '}
+                  <a
+                    href={`https://github.com/${projectA.repo}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="repo-link"
+                  >
+                    {formatRepoName(projectA.repo)}
+                  </a>
+                  {' '}vs{' '}
+                  <a
+                    href={`https://github.com/${projectB.repo}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="repo-link"
+                  >
+                    {formatRepoName(projectB.repo)}
+                  </a>
+                </>
+              )}
+            </label>
+            <div className="multiplier-container">
+              <input
+                id="multiplier"
+                type="number"
+                value={multiplier}
+                onChange={(e) => setMultiplier(e.target.value)}
+                placeholder="1.5"
+                min="1"
+                step="0.1"
+                className="multiplier-input"
+                disabled={isSubmitting || !selectedWinner}
+              />
+              <span className="multiplier-suffix">x</span>
             </div>
-          )}
+            <div className="multiplier-examples">
+              <span>1x = equal value</span>
+              <span>2x = twice as valuable</span>
+              <span>10x = ten times more valuable</span>
+            </div>
+          </div>
 
           <div className="reasoning-section">
             <label htmlFor="reasoning" className="reasoning-label">
@@ -405,17 +434,34 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
           cursor: not-allowed;
         }
 
+        .card-content {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+          align-items: center;
+          width: 100%;
+        }
+
         .project-name {
           font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
           font-size: 1rem;
           font-weight: 600;
           color: #1a202c;
-          text-decoration: none;
-          transition: color 0.2s;
+          text-align: center;
           display: block;
         }
 
-        .project-name:hover {
+        .github-link {
+          font-size: 0.85rem;
+          color: #64748b;
+          text-decoration: none;
+          transition: all 0.2s;
+          display: flex;
+          align-items: center;
+          gap: 0.25rem;
+        }
+
+        .github-link:hover {
           color: #3182ce;
           text-decoration: underline;
         }
