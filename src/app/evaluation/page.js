@@ -13,11 +13,12 @@ import { useServerNavigationState } from '@/hooks/useServerNavigationState'
 export default function EvaluationPage() {
   const { user, isLoggedIn, isLoading, logout } = useAuth()
   const router = useRouter()
-  
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
   // Debug logging - try multiple possible address fields
   const userAddress = user?.address || user?.ensName || user?.walletAddress
   console.log('EvaluationPage: Auth state:', { user, isLoggedIn, isLoading, userAddress })
-  
+
   const { state: navigationState, loading: navigationLoading, error: navigationError, completeScreen, navigateToScreen } = useServerNavigationState(userAddress)
 
 
@@ -220,6 +221,13 @@ export default function EvaluationPage() {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="hamburger-button"
+          aria-label="Open navigation menu"
+        >
+          ☰
+        </button>
         <h1 style={styles.title}>Deep Funding Public Juror</h1>
         <div style={styles.userInfo}>
           <span style={styles.address}>
@@ -232,16 +240,36 @@ export default function EvaluationPage() {
       </div>
 
       <div style={styles.bodyContainer}>
-        <NavigationSidebar 
+        <NavigationSidebar
           navigationItems={navigationState.navigationItems}
           currentScreen={navigationState.currentScreen}
           onNavigate={handleNavigateToScreen}
+          isMobileMenuOpen={isMobileMenuOpen}
+          onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
         />
-        
+
         <div style={styles.mainContent}>
           {renderCurrentScreen()}
         </div>
       </div>
+
+      <style jsx>{`
+        .hamburger-button {
+          display: none;
+          background-color: transparent;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          padding: 8px;
+          color: #333;
+        }
+
+        @media (max-width: 768px) {
+          .hamburger-button {
+            display: block;
+          }
+        }
+      `}</style>
     </div>
   )
 }
@@ -262,6 +290,7 @@ const styles = {
     alignItems: 'center',
     width: '100%',
     zIndex: 101,
+    gap: '12px',
   },
   bodyContainer: {
     display: 'flex',

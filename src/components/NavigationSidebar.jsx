@@ -2,10 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react'
 
-export function NavigationSidebar({ 
-  navigationItems, 
-  currentScreen, 
-  onNavigate 
+export function NavigationSidebar({
+  navigationItems,
+  currentScreen,
+  onNavigate,
+  isMobileMenuOpen = false,
+  onCloseMobileMenu = () => {}
 }) {
   const [itemWidths, setItemWidths] = useState({})
   const sidebarRef = useRef()
@@ -130,36 +132,62 @@ export function NavigationSidebar({
     return item.status === 'completed' || item.status === 'current' || item.status === 'in-progress'
   }
 
+  const handleItemClick = (itemId) => {
+    if (isClickable(navigationItems.find(item => item.id === itemId))) {
+      onNavigate(itemId)
+      onCloseMobileMenu() // Close menu after navigation on mobile
+    }
+  }
+
   return (
-    <div className="navigation-sidebar" ref={sidebarRef}>
-      <div className="sidebar-header">
-        <h3>Evaluation Progress</h3>
-      </div>
-      
-      <div className="navigation-list">
-        {navigationItems.map((item, index) => {
-          const truncatedText = truncateText(item.text, itemWidths.available)
-          const clickable = isClickable(item)
-          
-          return (
-            <button
-              key={item.id}
-              className={`nav-item ${item.status} ${item.id === currentScreen ? 'active' : ''}`}
-              onClick={() => clickable && onNavigate(item.id)}
-              disabled={!clickable}
-              style={{
-                color: getStatusColor(item),
-                cursor: clickable ? 'pointer' : 'default'
-              }}
-            >
-              <span className="nav-icon">{getStatusIcon(item)}</span>
-              <span className="nav-text">{truncatedText}</span>
-            </button>
-          )
-        })}
-      </div>
+    <>
+      {/* Backdrop for mobile overlay */}
+      {isMobileMenuOpen && (
+        <div className="mobile-backdrop" onClick={onCloseMobileMenu} />
+      )}
+
+      <div className={`navigation-sidebar ${isMobileMenuOpen ? 'mobile-open' : ''}`} ref={sidebarRef}>
+        <div className="sidebar-header">
+          <h3>Evaluation Progress</h3>
+          <button className="close-button" onClick={onCloseMobileMenu}>
+            ✕
+          </button>
+        </div>
+
+        <div className="navigation-list">
+          {navigationItems.map((item, index) => {
+            const truncatedText = truncateText(item.text, itemWidths.available)
+            const clickable = isClickable(item)
+
+            return (
+              <button
+                key={item.id}
+                className={`nav-item ${item.status} ${item.id === currentScreen ? 'active' : ''}`}
+                onClick={() => handleItemClick(item.id)}
+                disabled={!clickable}
+                style={{
+                  color: getStatusColor(item),
+                  cursor: clickable ? 'pointer' : 'default'
+                }}
+              >
+                <span className="nav-icon">{getStatusIcon(item)}</span>
+                <span className="nav-text">{truncatedText}</span>
+              </button>
+            )
+          })}
+        </div>
 
       <style jsx>{`
+        /* Mobile backdrop - hidden on desktop */
+        .mobile-backdrop {
+          display: none;
+        }
+
+        /* Close button - hidden on desktop */
+        .close-button {
+          display: none;
+        }
+
         .navigation-sidebar {
           width: 280px;
           min-width: 200px;
@@ -177,6 +205,9 @@ export function NavigationSidebar({
           margin-bottom: 1.5rem;
           padding-bottom: 1rem;
           border-bottom: 1px solid #e2e8f0;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
         }
 
         .sidebar-header h3 {
@@ -257,17 +288,46 @@ export function NavigationSidebar({
 
         /* Mobile responsiveness */
         @media (max-width: 768px) {
+          .mobile-backdrop {
+            display: block;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 998;
+          }
+
+          .close-button {
+            display: block;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: #4a5568;
+            cursor: pointer;
+            padding: 0.5rem;
+          }
+
           .navigation-sidebar {
-            width: 100%;
-            height: auto;
-            position: relative;
-            max-height: 200px;
-            border-right: none;
-            border-bottom: 1px solid #e2e8f0;
+            position: fixed;
+            top: 0;
+            left: -100%;
+            width: 80%;
+            max-width: 320px;
+            height: 100vh;
+            z-index: 999;
+            transition: left 0.3s ease-in-out;
+            border-right: 1px solid #e2e8f0;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+          }
+
+          .navigation-sidebar.mobile-open {
+            left: 0;
           }
 
           .navigation-list {
-            max-height: 150px;
+            max-height: calc(100vh - 120px);
           }
 
           .nav-item {
@@ -277,5 +337,6 @@ export function NavigationSidebar({
         }
       `}</style>
     </div>
+    </>
   )
 }
