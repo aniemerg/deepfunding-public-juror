@@ -139,8 +139,19 @@ export function ComparisonScreen({ screenId: passedScreenId, projectPair: planne
     setIsSubmitting(true)
     setError(null)
 
+    // Create explicit submit data with wasSkipped: false
+    const submitData = {
+      projectA: projectA?.repo || '',
+      projectB: projectB?.repo || '',
+      winner: selectedWinner,
+      multiplier: multiplier ? parseFloat(multiplier) : null,
+      reasoning: reasoning,
+      wasSkipped: false,  // Explicitly false when submitting
+      comparisonTimestamp: new Date().toISOString()
+    }
+
     try {
-      await submitScreen(user.address, screenType, screenId, data)
+      await submitScreen(user.address, screenType, screenId, submitData)
       setLastSubmittedAt(new Date().toISOString())
 
       // Auto-dismiss the success toast after 3 seconds

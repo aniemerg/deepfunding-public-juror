@@ -123,8 +123,18 @@ export function SimilarProjectsScreen({ screenId: passedScreenId, targetProject:
     setIsSubmitting(true)
     setError(null)
 
+    // Create explicit submit data with wasSkipped: false
+    const submitData = {
+      targetProject: targetProject?.repo || '',
+      similarProject: selectedProject,
+      similarMultiplier: multiplier ? parseFloat(multiplier) : null,
+      reasoning: reasoning,
+      wasSkipped: false,  // Explicitly false when submitting
+      similarTimestamp: new Date().toISOString()
+    }
+
     try {
-      await submitScreen(user.address, screenType, screenId, data)
+      await submitScreen(user.address, screenType, screenId, submitData)
       setLastSubmittedAt(new Date().toISOString())
 
       // Auto-dismiss the success toast after 3 seconds

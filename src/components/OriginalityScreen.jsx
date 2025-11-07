@@ -93,8 +93,17 @@ export function OriginalityScreen({ screenId: passedScreenId, targetProject, onN
     setIsSubmitting(true)
     setError(null)
 
+    // Create explicit submit data with wasSkipped: false
+    const submitData = {
+      targetRepo: targetProject?.repo || '',
+      originalityPercentage: originality,
+      reasoning: reasoning,
+      wasSkipped: false,  // Explicitly false when submitting
+      assessmentTimestamp: new Date().toISOString()
+    }
+
     try {
-      await submitScreen(user.address, screenType, screenId, data)
+      await submitScreen(user.address, screenType, screenId, submitData)
       setLastSubmittedAt(new Date().toISOString())
 
       // Auto-dismiss the success toast after 3 seconds
