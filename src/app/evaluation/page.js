@@ -87,8 +87,15 @@ export default function EvaluationPage() {
   const handleNext = async (screenData = {}) => {
     try {
       setIsTransitioning(true)
-      // Call completeScreen to trigger plan generation and navigation updates
-      await completeScreen(navigationState.currentScreen, screenData)
+
+      // Check if screen already completed by submitScreen
+      if (screenData.alreadyCompleted) {
+        // Just refresh navigation state, don't call completeScreen
+        await refreshState()
+      } else {
+        // Legacy path: call completeScreen (for screens that don't use submitScreen)
+        await completeScreen(navigationState.currentScreen, screenData)
+      }
     } catch (error) {
       // Use debug endpoint for logging since console.log doesn't work
       fetch('/api/debug', {
@@ -171,6 +178,7 @@ export default function EvaluationPage() {
         return (
           <SimilarProjectsScreen
             key={navigationState.currentScreen}
+            screenId={navigationState.currentScreen}
             targetProject={currentNavItem.data?.targetProject}
             onNext={handleNext}
             onBack={handleBack}
@@ -182,6 +190,7 @@ export default function EvaluationPage() {
         return (
           <ComparisonScreen
             key={navigationState.currentScreen}
+            screenId={navigationState.currentScreen}
             projectPair={currentNavItem.data?.projectPair}
             onNext={handleNext}
             onBack={handleBack}
@@ -193,6 +202,7 @@ export default function EvaluationPage() {
         return (
           <OriginalityScreen
             key={navigationState.currentScreen}
+            screenId={navigationState.currentScreen}
             targetProject={currentNavItem.data?.targetProject}
             onNext={handleNext}
             onBack={handleBack}

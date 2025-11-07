@@ -11,7 +11,7 @@ import {
   getFundingPercentage 
 } from '@/lib/eloHelpers'
 
-export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onNext, onBack, onForward, isCompleted, onProjectChange }) {
+export function SimilarProjectsScreen({ screenId: passedScreenId, targetProject: plannedTargetProject, onNext, onBack, onForward, isCompleted, onProjectChange }) {
   const { user } = useAuth()
   const [targetProject, setTargetProject] = useState(null)
   const [selectedProject, setSelectedProject] = useState('')
@@ -24,7 +24,8 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
   const [error, setError] = useState(null)
 
   const screenType = 'similar_projects'
-  const screenId = `similar-${targetProject?.repo || 'pending'}`
+  // Use the screenId passed from parent as-is (e.g., "similar_projects_1")
+  const screenId = passedScreenId || 'similar_projects_1'
   const data = {
     targetProject: targetProject?.repo || '',
     similarProject: selectedProject,
@@ -134,7 +135,7 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
       // After brief success display, move to next screen
       setTimeout(() => {
         if (onNext) {
-          onNext()
+          onNext({ alreadyCompleted: true })
         }
         setIsSubmitting(false) // Reset submitting state after navigation
       }, 1500)
@@ -177,7 +178,7 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
         // After brief success display, move to next screen
         setTimeout(() => {
           if (onNext) {
-            onNext()
+            onNext({ alreadyCompleted: true })
           }
           setIsSubmitting(false)
         }, 1500)

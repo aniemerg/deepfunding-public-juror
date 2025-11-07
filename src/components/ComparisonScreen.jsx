@@ -10,7 +10,7 @@ import {
   formatRepoName
 } from '@/lib/eloHelpers'
 
-export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBack, onForward, isCompleted, onProjectChange }) {
+export function ComparisonScreen({ screenId: passedScreenId, projectPair: plannedProjectPair, onNext, onBack, onForward, isCompleted, onProjectChange }) {
   const { user } = useAuth()
   const [projectA, setProjectA] = useState(null)
   const [projectB, setProjectB] = useState(null)
@@ -23,8 +23,8 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
   const [error, setError] = useState(null)
 
   const screenType = 'comparison'
-  const comparisonId = projectA && projectB ? `${projectA.repo}-vs-${projectB.repo}` : 'pending'
-  const screenId = `comparison-${comparisonId}`
+  // Use the screenId passed from parent as-is (e.g., "comparison_1")
+  const screenId = passedScreenId || 'comparison_1'
   
   const data = {
     projectA: projectA?.repo || '',
@@ -151,7 +151,7 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
       // After brief success display, move to next screen
       setTimeout(() => {
         if (onNext) {
-          onNext()
+          onNext({ alreadyCompleted: true })
         }
         setIsSubmitting(false) // Reset submitting state after navigation
       }, 1500)
@@ -195,7 +195,7 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
         // After brief success display, move to next screen
         setTimeout(() => {
           if (onNext) {
-            onNext()
+            onNext({ alreadyCompleted: true })
           }
           setIsSubmitting(false)
         }, 1500)

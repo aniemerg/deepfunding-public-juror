@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useAutosave, useDataSubmission } from '@/hooks/useAutoSave'
 
-export function OriginalityScreen({ targetProject, onNext, onBack, onForward, isCompleted }) {
+export function OriginalityScreen({ screenId: passedScreenId, targetProject, onNext, onBack, onForward, isCompleted }) {
   const { user } = useAuth()
   const [originality, setOriginality] = useState(80)
   const [reasoning, setReasoning] = useState('')
@@ -14,7 +14,8 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
   const [error, setError] = useState(null)
 
   const screenType = 'originality'
-  const screenId = targetProject ? `originality-${targetProject.repo.replace(/\//g, '-')}` : 'pending'
+  // Use the screenId passed from parent as-is (e.g., "originality_1")
+  const screenId = passedScreenId || 'originality_1'
 
   const data = {
     targetRepo: targetProject?.repo || '',
@@ -104,7 +105,7 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
       // After brief success display, move to next screen
       setTimeout(() => {
         if (onNext) {
-          onNext()
+          onNext({ alreadyCompleted: true })
         }
         setIsSubmitting(false)
       }, 1500)
@@ -145,7 +146,7 @@ export function OriginalityScreen({ targetProject, onNext, onBack, onForward, is
         // After brief success display, move to next screen
         setTimeout(() => {
           if (onNext) {
-            onNext()
+            onNext({ alreadyCompleted: true })
           }
           setIsSubmitting(false)
         }, 1500)

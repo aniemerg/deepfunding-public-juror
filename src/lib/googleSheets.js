@@ -139,20 +139,19 @@ async function markPreviousSubmissionsOld(env, accessToken, sheetName, walletAdd
 }
 
 // Submit background screen data
-export async function submitBackgroundData(env, { ensName, backgroundText, wasSkipped }) {
+export async function submitBackgroundData(env, { ensName, backgroundText }) {
   const accessToken = await getAccessToken(env);
   const submissionId = generateSubmissionId();
   const sheetName = "Background";
-  
+
   const values = [
     submissionId,
     1, // version
     ensName,
     new Date().toISOString(),
-    wasSkipped.toString(),
     backgroundText || ''
   ];
-  
+
   return await appendToSheet(env, accessToken, sheetName, values);
 }
 
@@ -177,7 +176,7 @@ export async function submitPersonalScaleData(env, { ensName, mostValuableRepo, 
 }
 
 // Submit similar project data
-export async function submitSimilarProjectData(env, { ensName, screenNumber, targetRepo, selectedRepo, multiplier, reasoning, wasSkipped = false }) {
+export async function submitSimilarProjectData(env, { ensName, screenNumber, targetRepo, selectedRepo, multiplier, reasoning }) {
   const accessToken = await getAccessToken(env);
   const submissionId = generateSubmissionId();
   const sheetName = "SimilarProjects";
@@ -187,7 +186,6 @@ export async function submitSimilarProjectData(env, { ensName, screenNumber, tar
     1, // version
     ensName,
     new Date().toISOString(),
-    wasSkipped.toString(),
     screenNumber.toString(),
     targetRepo,
     selectedRepo,
@@ -199,7 +197,7 @@ export async function submitSimilarProjectData(env, { ensName, screenNumber, tar
 }
 
 // Submit comparison data
-export async function submitComparisonData(env, { ensName, comparisonNumber, repoA, repoB, winner, loser, multiplier, reasoning, wasSkipped = false }) {
+export async function submitComparisonData(env, { ensName, comparisonNumber, repoA, repoB, winner, loser, multiplier, reasoning }) {
   const accessToken = await getAccessToken(env);
   const submissionId = generateSubmissionId();
   const sheetName = "Comparisons";
@@ -209,7 +207,6 @@ export async function submitComparisonData(env, { ensName, comparisonNumber, rep
     1, // version
     ensName,
     new Date().toISOString(),
-    wasSkipped.toString(),
     comparisonNumber.toString(),
     repoA,
     repoB,
@@ -223,7 +220,7 @@ export async function submitComparisonData(env, { ensName, comparisonNumber, rep
 }
 
 // Submit originality data
-export async function submitOriginalityData(env, { ensName, targetRepo, originalityPercentage, reasoning, wasSkipped = false }) {
+export async function submitOriginalityData(env, { ensName, targetRepo, originalityPercentage, reasoning }) {
   const accessToken = await getAccessToken(env);
   const submissionId = generateSubmissionId();
   const sheetName = "Originality";
@@ -233,7 +230,6 @@ export async function submitOriginalityData(env, { ensName, targetRepo, original
     1, // version
     ensName,
     new Date().toISOString(),
-    wasSkipped.toString(),
     targetRepo,
     originalityPercentage.toString(),
     reasoning || ''
