@@ -368,7 +368,7 @@ function cmdExport(user, filename, env, useLocal = false) {
 }
 
 // Command: clear - Delete all user data
-async function cmdClear(user, env, useLocal = false) {
+async function cmdClear(user, env, useLocal = false, force = false) {
   const storageType = useLocal ? 'local' : 'remote';
   warning(`\nAbout to delete ALL data for ${user}`);
   log(`Storage: ${storageType}`);
@@ -392,20 +392,25 @@ async function cmdClear(user, env, useLocal = false) {
   userKeys.forEach(key => log(`  ${key}`, colors.red));
   log('');
 
-  // Extra confirmation for production
-  if (env === 'production' && !useLocal) {
-    error('WARNING: You are about to delete PRODUCTION data!');
-    const confirm1 = await askConfirmation('Type "yes" to confirm production delete');
-    if (!confirm1) {
+  // Skip confirmations if --force flag is set
+  if (!force) {
+    // Extra confirmation for production
+    if (env === 'production' && !useLocal) {
+      error('WARNING: You are about to delete PRODUCTION data!');
+      const confirm1 = await askConfirmation('Type "yes" to confirm production delete');
+      if (!confirm1) {
+        log('Cancelled.');
+        return;
+      }
+    }
+
+    const confirmed = await askConfirmation('Are you sure?');
+    if (!confirmed) {
       log('Cancelled.');
       return;
     }
-  }
-
-  const confirmed = await askConfirmation('Are you sure?');
-  if (!confirmed) {
-    log('Cancelled.');
-    return;
+  } else {
+    warning('--force flag detected, skipping confirmations');
   }
 
   // Delete all keys
@@ -535,7 +540,7 @@ function showHelp() {
   log('  kv-manager list [--local] [--env=preview|production]');
   log('  kv-manager inspect <user> [--verbose] [--local] [--env=preview|production]');
   log('  kv-manager export <user> <file> [--local] [--env=preview|production]');
-  log('  kv-manager clear <user> [--local] [--env=preview|production]');
+  log('  kv-manager clear <user> [--local] [--force] [--env=preview|production]');
   log('  kv-manager clear-pattern <pattern> [--env=preview|production]');
   log('  kv-manager clear-local');
   log('\nCommands:', colors.cyan);
@@ -549,13 +554,14 @@ function showHelp() {
   log('  --local           Use local KV storage (for "npm run preview")');
   log('  --env=preview     Use preview KV namespace (default)');
   log('  --env=production  Use production KV namespace (requires extra confirmation)');
+  log('  --force           Skip confirmation prompts (use with caution!)');
   log('  --verbose         Show full data in inspect command');
   log('\nExamples:', colors.cyan);
   log('  kv-manager list --local                    # List users in local dev storage');
   log('  kv-manager clear allanniemerg.eth --local  # Clear local dev data');
   log('  kv-manager inspect vitalik.eth --verbose   # Inspect remote KV');
   log('  kv-manager export alice.eth backup.json --local');
-  log('  kv-manager clear vitalik.eth --env=production');
+  log('  kv-manager clear vitalik.eth --env=production --force   # Force clear production');
   log('  kv-manager clear-local                     # Alternative to clear all local data');
   log('');
 }
@@ -601,10 +607,10 @@ async function main() {
 
       case 'clear':
         if (params.length < 1) {
-          error('Usage: kv-manager clear <user> [--local]');
+          error('Usage: kv-manager clear <user> [--local] [--force]');
           process.exit(1);
         }
-        await cmdClear(params[0], env, useLocal);
+        await cmdClear(params[0], env, useLocal, flags.force);
         break;
 
       case 'clear-pattern':
