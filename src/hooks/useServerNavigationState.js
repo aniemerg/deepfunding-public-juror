@@ -3,32 +3,39 @@ import { useState, useEffect, useCallback } from 'react'
 export function useServerNavigationState(userAddress) {
   const [state, setState] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState(null)
-  
-  const loadState = useCallback(async () => {
-    console.log('useServerNavigationState: loadState called with userAddress:', userAddress)
-    
+
+  const loadState = useCallback(async (isInitialLoad = false) => {
+    console.log('useServerNavigationState: loadState called with userAddress:', userAddress, 'isInitialLoad:', isInitialLoad)
+
     if (!userAddress) {
       console.log('useServerNavigationState: No userAddress, setting state to null')
       setState(null)
       setLoading(false)
       return
     }
-    
+
     try {
       setError(null)
-      setLoading(true)
+      // Only set loading on initial load, use isRefreshing for subsequent loads
+      if (isInitialLoad) {
+        setLoading(true)
+      } else {
+        setIsRefreshing(true)
+      }
+
       const url = `/api/navigation-state?userAddress=${encodeURIComponent(userAddress)}`
       console.log('useServerNavigationState: Fetching navigation state from:', url)
-      
+
       const response = await fetch(url)
-      
+
       if (!response.ok) {
         const errorText = await response.text()
         console.error('useServerNavigationState: API error:', response.status, errorText)
         throw new Error(`Failed to load navigation state: ${response.status} - ${errorText}`)
       }
-      
+
       const navigationState = await response.json()
       console.log('useServerNavigationState: Successfully loaded state:', navigationState)
       setState(navigationState)
@@ -49,7 +56,11 @@ export function useServerNavigationState(userAddress) {
         plan: null
       })
     } finally {
-      setLoading(false)
+      if (isInitialLoad) {
+        setLoading(false)
+      } else {
+        setIsRefreshing(false)
+      }
     }
   }, [userAddress])
   
@@ -114,15 +125,21 @@ export function useServerNavigationState(userAddress) {
   
   // Load state when userAddress changes
   useEffect(() => {
-    loadState()
+    loadState(true) // Initial load
   }, [loadState])
-  
-  return { 
-    state, 
-    loading, 
+
+  // Create refresh function that doesn't use loading state
+  const refreshState = useCallback(() => {
+    return loadState(false) // Not initial load
+  }, [loadState])
+
+  return {
+    state,
+    loading,
+    isRefreshing,
     error,
-    completeScreen, 
-    navigateToScreen, 
-    refreshState: loadState 
+    completeScreen,
+    navigateToScreen,
+    refreshState
   }
 }

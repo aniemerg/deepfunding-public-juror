@@ -410,12 +410,20 @@ async function cmdClear(user, env, useLocal = false) {
 
   // Delete all keys
   let deleted = 0;
+  const total = userKeys.length;
+  info(`\nDeleting ${total} keys...`);
+
   for (const key of userKeys) {
     if (deleteKey(key, env, useLocal)) {
       deleted++;
+      // Log progress every 10 keys
+      if (deleted % 10 === 0 || deleted === total) {
+        process.stdout.write(`\r  Progress: ${deleted}/${total} keys deleted`);
+      }
     }
   }
 
+  console.log(''); // New line after progress
   success(`Deleted ${deleted} keys`);
 }
 
@@ -459,12 +467,20 @@ async function cmdClearPattern(pattern, env) {
 
   // Delete all matching keys
   let deleted = 0;
+  const total = matchingKeys.length;
+  info(`\nDeleting ${total} keys...`);
+
   for (const key of matchingKeys) {
     if (deleteKey(key, env)) {
       deleted++;
+      // Log progress every 10 keys
+      if (deleted % 10 === 0 || deleted === total) {
+        process.stdout.write(`\r  Progress: ${deleted}/${total} keys deleted`);
+      }
     }
   }
 
+  console.log(''); // New line after progress
   success(`Deleted ${deleted} keys`);
 }
 

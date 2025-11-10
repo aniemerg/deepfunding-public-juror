@@ -142,13 +142,11 @@ export function SimilarProjectsScreen({ screenId: passedScreenId, targetProject:
         setLastSubmittedAt(null)
       }, 3000)
 
-      // After brief success display, move to next screen
-      setTimeout(() => {
-        if (onNext) {
-          onNext({ alreadyCompleted: true })
-        }
-        setIsSubmitting(false) // Reset submitting state after navigation
-      }, 1500)
+      // Move to next screen immediately
+      if (onNext) {
+        onNext({ alreadyCompleted: true })
+      }
+      setIsSubmitting(false)
     } catch (error) {
       console.error('Submission failed:', error)
       setError('Failed to submit comparison. Please try again.')
@@ -185,13 +183,11 @@ export function SimilarProjectsScreen({ screenId: passedScreenId, targetProject:
           setLastSubmittedAt(null)
         }, 3000)
 
-        // After brief success display, move to next screen
-        setTimeout(() => {
-          if (onNext) {
-            onNext({ alreadyCompleted: true })
-          }
-          setIsSubmitting(false)
-        }, 1500)
+        // Move to next screen immediately
+        if (onNext) {
+          onNext({ alreadyCompleted: true })
+        }
+        setIsSubmitting(false)
       } catch (error) {
         console.error('Skip submission failed:', error)
         setError('Failed to skip assessment. Please try again.')

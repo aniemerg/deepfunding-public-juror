@@ -49,3 +49,4 @@ design/
 
 # ignore AI
 CLAUDE.md
+.env.local
