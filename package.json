@@ -5,7 +5,7 @@
 	"private": true,
 	"scripts": {
 		"dev": "next dev --turbopack",
-		"prebuild": "node scripts/generate-elo-data.js",
+		"prebuild": "node scripts/set-version.js && node scripts/generate-elo-data.js",
 		"build": "next build",
 		"start": "next start",
 		"lint": "next lint",

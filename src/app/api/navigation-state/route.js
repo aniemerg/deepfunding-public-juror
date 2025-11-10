@@ -93,10 +93,16 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
   if (!plan) {
     // Return a stub plan with just background and range_definition
     // Check completion and in-progress status for these screens
-    const backgroundCompleted = await kv.get(`user:${userAddress}:completed:background`)
-    const rangeCompleted = await kv.get(`user:${userAddress}:completed:range_definition`)
+    const backgroundCompletedData = await kv.get(`user:${userAddress}:completed:background`)
+    const rangeCompletedData = await kv.get(`user:${userAddress}:completed:range_definition`)
     const backgroundInProgress = await kv.get(`user:${userAddress}:in-progress:background`)
     const rangeInProgress = await kv.get(`user:${userAddress}:in-progress:range_definition`)
+
+    // Parse completion data to check for skip status
+    const backgroundCompleted = !!backgroundCompletedData
+    const rangeCompleted = !!rangeCompletedData
+    const backgroundSkipped = backgroundCompletedData ? JSON.parse(backgroundCompletedData).wasSkipped : false
+    const rangeSkipped = rangeCompletedData ? JSON.parse(rangeCompletedData).wasSkipped : false
 
     // Determine current screen first
     let currentScreen = 'background'
@@ -118,7 +124,8 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
       }))
     }
 
-    const getStatus = (id, completed, inProgress) => {
+    const getStatus = (id, completed, skipped, inProgress) => {
+      if (skipped) return 'skipped'
       if (completed) return 'completed'
       if (id === currentScreen) return 'current'
       if (inProgress) return 'in-progress'
@@ -130,13 +137,13 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
         id: 'background',
         screenType: 'background',
         text: 'Background',
-        status: getStatus('background', backgroundCompleted, backgroundInProgress)
+        status: getStatus('background', backgroundCompleted, backgroundSkipped, backgroundInProgress)
       },
       {
         id: 'range_definition',
         screenType: 'range_definition',
         text: 'Personal Scale',
-        status: getStatus('range_definition', rangeCompleted, rangeInProgress)
+        status: getStatus('range_definition', rangeCompleted, rangeSkipped, rangeInProgress)
       }
     ]
 
@@ -149,6 +156,7 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
   
   // Load completion and in-progress status for all possible screens
   const completedScreens = new Set()
+  const skippedScreens = new Set()
   const inProgressScreens = new Set()
 
   // Check each screen type
@@ -164,24 +172,40 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
     screenChecks.push(...plan.originalityProjects.map((_, i) => `originality_${i + 1}`))
   }
 
+  // Migration: Add wasSkipped field to old completion records
   for (const screenId of screenChecks) {
-    const completed = await kv.get(`user:${userAddress}:completed:${screenId}`)
+    const completedData = await kv.get(`user:${userAddress}:completed:${screenId}`)
     const inProgress = await kv.get(`user:${userAddress}:in-progress:${screenId}`)
-    if (completed) {
-      completedScreens.add(screenId)
+    if (completedData) {
+      const parsed = JSON.parse(completedData)
+
+      // Migration: v1 → v2 (added wasSkipped field to completion tracking)
+      if (!('wasSkipped' in parsed)) {
+        // Old data - add wasSkipped field and resave
+        parsed.wasSkipped = false  // Default: assume not skipped for old data
+        await kv.put(`user:${userAddress}:completed:${screenId}`, JSON.stringify(parsed))
+        console.log(`Migrated completion data to v2 (added wasSkipped) for screen: ${screenId}`)
+      }
+
+      // Check if this was skipped - only add to one set, not both
+      if (parsed.wasSkipped) {
+        skippedScreens.add(screenId)
+      } else {
+        completedScreens.add(screenId)
+      }
     } else if (inProgress) {
       inProgressScreens.add(screenId)
     }
   }
   
   // Create navigation items from plan + completion and in-progress data
-  const navigationItems = createNavigationFromPlan(plan, completedScreens, inProgressScreens)
+  const navigationItems = createNavigationFromPlan(plan, completedScreens, skippedScreens, inProgressScreens)
 
-  // Find current screen (first non-completed)
-  const currentScreen = findCurrentScreen(navigationItems, completedScreens)
+  // Find current screen (first non-completed and non-skipped)
+  const currentScreen = findCurrentScreen(navigationItems, completedScreens, skippedScreens)
 
-  // Mark current screen as in-progress if not already completed
-  if (!completedScreens.has(currentScreen) && currentScreen !== 'completion') {
+  // Mark current screen as in-progress if not already completed or skipped
+  if (!completedScreens.has(currentScreen) && !skippedScreens.has(currentScreen) && currentScreen !== 'completion') {
     await kv.put(`user:${userAddress}:in-progress:${currentScreen}`, JSON.stringify({
       startedAt: new Date().toISOString()
     }))
@@ -233,8 +257,9 @@ function getInitialNavigationStateWithStub() {
   }
 }
 
-function createNavigationFromPlan(plan, completedScreens, inProgressScreens) {
+function createNavigationFromPlan(plan, completedScreens, skippedScreens, inProgressScreens) {
   const getStatus = (id) => {
+    if (skippedScreens.has(id)) return 'skipped'
     if (completedScreens.has(id)) return 'completed'
     if (inProgressScreens.has(id)) return 'in-progress'
     return 'pending'
@@ -295,30 +320,32 @@ function createNavigationFromPlan(plan, completedScreens, inProgressScreens) {
     })
   }
 
-  // Add completion
-  const allRequiredCompleted = items.every(item => completedScreens.has(item.id))
+  // Add completion - accessible when all screens are either completed OR skipped
+  const allRequiredDone = items.every(item =>
+    completedScreens.has(item.id) || skippedScreens.has(item.id)
+  )
   items.push({
     id: 'completion',
     screenType: 'completion',
     text: 'Complete',
-    status: allRequiredCompleted ? 'current' : 'pending',
+    status: allRequiredDone ? 'current' : 'pending',
     data: null
   })
 
   return items
 }
 
-function findCurrentScreen(navigationItems, completedScreens) {
-  // Find first non-completed screen
-  const incompleteScreen = navigationItems.find(item => 
-    !completedScreens.has(item.id) && item.id !== 'completion'
+function findCurrentScreen(navigationItems, completedScreens, skippedScreens) {
+  // Find first non-completed and non-skipped screen
+  const incompleteScreen = navigationItems.find(item =>
+    !completedScreens.has(item.id) && !skippedScreens.has(item.id) && item.id !== 'completion'
   )
-  
+
   if (incompleteScreen) {
     return incompleteScreen.id
   }
-  
-  // If all screens completed, go to completion
+
+  // If all screens completed or skipped, go to completion
   return 'completion'
 }
 
@@ -326,11 +353,20 @@ async function handleCompleteScreen(userAddress, screenId, data, kv) {
   if (!screenId || !data) {
     return Response.json({ error: 'screenId and data required' }, { status: 400 })
   }
-  
+
   // 1. Mark as completed in KV (and remove in-progress status)
+  // IMPORTANT: Read existing completion record first to preserve wasSkipped flag
+  const existingCompletion = await kv.get(`user:${userAddress}:completed:${screenId}`)
+  let existingWasSkipped = false
+  if (existingCompletion) {
+    const parsed = JSON.parse(existingCompletion)
+    existingWasSkipped = parsed.wasSkipped || false
+  }
+
   await kv.delete(`user:${userAddress}:in-progress:${screenId}`)
   await kv.put(`user:${userAddress}:completed:${screenId}`, JSON.stringify({
     completed: true,
+    wasSkipped: existingWasSkipped || data.wasSkipped || false,  // Preserve existing or use new
     timestamp: new Date().toISOString(),
     data: data
   }))
@@ -393,8 +429,8 @@ async function handleNavigateToScreen(userAddress, screenId, kv) {
     return Response.json({ error: 'Screen not found' }, { status: 404 })
   }
 
-  // Only allow navigation to completed, in-progress, or current screens
-  const allowedStatuses = ['completed', 'in-progress', 'current']
+  // Only allow navigation to completed, skipped, in-progress, or current screens
+  const allowedStatuses = ['completed', 'skipped', 'in-progress', 'current']
   const isCurrentScreen = screenId === currentState.currentScreen
 
   if (!allowedStatuses.includes(targetItem.status) && !isCurrentScreen) {

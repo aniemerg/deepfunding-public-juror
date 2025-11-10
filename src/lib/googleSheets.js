@@ -139,20 +139,19 @@ async function markPreviousSubmissionsOld(env, accessToken, sheetName, walletAdd
 }
 
 // Submit background screen data
-export async function submitBackgroundData(env, { ensName, backgroundText, wasSkipped }) {
+export async function submitBackgroundData(env, { ensName, backgroundText }) {
   const accessToken = await getAccessToken(env);
   const submissionId = generateSubmissionId();
   const sheetName = "Background";
-  
+
   const values = [
     submissionId,
     1, // version
     ensName,
     new Date().toISOString(),
-    wasSkipped.toString(),
     backgroundText || ''
   ];
-  
+
   return await appendToSheet(env, accessToken, sheetName, values);
 }
 
@@ -181,7 +180,7 @@ export async function submitSimilarProjectData(env, { ensName, screenNumber, tar
   const accessToken = await getAccessToken(env);
   const submissionId = generateSubmissionId();
   const sheetName = "SimilarProjects";
-  
+
   const values = [
     submissionId,
     1, // version
@@ -193,7 +192,7 @@ export async function submitSimilarProjectData(env, { ensName, screenNumber, tar
     multiplier ? multiplier.toString() : '',
     reasoning || ''
   ];
-  
+
   return await appendToSheet(env, accessToken, sheetName, values);
 }
 
@@ -202,7 +201,7 @@ export async function submitComparisonData(env, { ensName, comparisonNumber, rep
   const accessToken = await getAccessToken(env);
   const submissionId = generateSubmissionId();
   const sheetName = "Comparisons";
-  
+
   const values = [
     submissionId,
     1, // version
@@ -216,7 +215,7 @@ export async function submitComparisonData(env, { ensName, comparisonNumber, rep
     multiplier.toString(),
     reasoning || ''
   ];
-  
+
   return await appendToSheet(env, accessToken, sheetName, values);
 }
 
@@ -225,7 +224,7 @@ export async function submitOriginalityData(env, { ensName, targetRepo, original
   const accessToken = await getAccessToken(env);
   const submissionId = generateSubmissionId();
   const sheetName = "Originality";
-  
+
   const values = [
     submissionId,
     1, // version
@@ -235,7 +234,7 @@ export async function submitOriginalityData(env, { ensName, targetRepo, original
     originalityPercentage.toString(),
     reasoning || ''
   ];
-  
+
   return await appendToSheet(env, accessToken, sheetName, values);
 }
 

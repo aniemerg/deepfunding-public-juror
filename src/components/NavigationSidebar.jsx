@@ -128,8 +128,8 @@ export function NavigationSidebar({
   }
 
   const isClickable = (item) => {
-    // Can click completed items, current item, or in-progress items
-    return item.status === 'completed' || item.status === 'current' || item.status === 'in-progress'
+    // Can click completed items, skipped items, current item, or in-progress items
+    return item.status === 'completed' || item.status === 'skipped' || item.status === 'current' || item.status === 'in-progress'
   }
 
   const handleItemClick = (itemId) => {

@@ -11,24 +11,27 @@ import {
   getFundingPercentage 
 } from '@/lib/eloHelpers'
 
-export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onNext, onBack, onForward, isCompleted, onProjectChange }) {
+export function SimilarProjectsScreen({ screenId: passedScreenId, targetProject: plannedTargetProject, onNext, onBack, onForward, isCompleted, onProjectChange }) {
   const { user } = useAuth()
   const [targetProject, setTargetProject] = useState(null)
   const [selectedProject, setSelectedProject] = useState('')
   const [multiplier, setMultiplier] = useState('1.0')
   const [reasoning, setReasoning] = useState('')
+  const [wasSkipped, setWasSkipped] = useState(false)
   const [suggestions, setSuggestions] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastSubmittedAt, setLastSubmittedAt] = useState(null)
   const [error, setError] = useState(null)
 
   const screenType = 'similar_projects'
-  const screenId = `similar-${targetProject?.repo || 'pending'}`
+  // Use the screenId passed from parent as-is (e.g., "similar_projects_1")
+  const screenId = passedScreenId || 'similar_projects_1'
   const data = {
     targetProject: targetProject?.repo || '',
     similarProject: selectedProject,
     similarMultiplier: multiplier ? parseFloat(multiplier) : null,
     reasoning: reasoning,
+    wasSkipped,
     similarTimestamp: new Date().toISOString()
   }
 
@@ -93,6 +96,7 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
         setSelectedProject(submission.data.similarProject || '')
         setMultiplier(submission.data.similarMultiplier ? String(submission.data.similarMultiplier) : '1.0')
         setReasoning(submission.data.reasoning || '')
+        setWasSkipped(submission.data.wasSkipped || false)
         setLastSubmittedAt(submission.data.similarTimestamp)
       }
     } catch (error) {
@@ -102,42 +106,94 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
-    if (!selectedProject || !multiplier) {
+
+    if (!wasSkipped && (!selectedProject || !multiplier)) {
       setError('Please select a project and specify the multiplier')
       return
     }
 
-    const mult = parseFloat(multiplier)
-    if (mult < 1.0 || mult > 2.0) {
-      setError('Multiplier must be between 1.0 and 2.0')
-      return
+    if (!wasSkipped) {
+      const mult = parseFloat(multiplier)
+      if (mult < 1.0 || mult > 2.0) {
+        setError('Multiplier must be between 1.0 and 2.0')
+        return
+      }
     }
 
     setIsSubmitting(true)
     setError(null)
 
+    // Create explicit submit data with wasSkipped: false
+    const submitData = {
+      targetProject: targetProject?.repo || '',
+      similarProject: selectedProject,
+      similarMultiplier: multiplier ? parseFloat(multiplier) : null,
+      reasoning: reasoning,
+      wasSkipped: false,  // Explicitly false when submitting
+      similarTimestamp: new Date().toISOString()
+    }
+
     try {
-      await submitScreen(user.address, screenType, screenId, data)
+      await submitScreen(user.address, screenType, screenId, submitData)
       setLastSubmittedAt(new Date().toISOString())
-      
+
       // Auto-dismiss the success toast after 3 seconds
       setTimeout(() => {
         setLastSubmittedAt(null)
       }, 3000)
-      
-      // After brief success display, move to next screen
-      setTimeout(() => {
-        if (onNext) {
-          onNext()
-        }
-        setIsSubmitting(false) // Reset submitting state after navigation
-      }, 1500)
+
+      // Move to next screen immediately
+      if (onNext) {
+        onNext({ alreadyCompleted: true })
+      }
+      setIsSubmitting(false)
     } catch (error) {
       console.error('Submission failed:', error)
       setError('Failed to submit comparison. Please try again.')
       setIsSubmitting(false)
     }
+  }
+
+  const handleSkip = async () => {
+    setWasSkipped(true)
+    setSelectedProject('')
+    setMultiplier('1.0')
+    setReasoning('')
+
+    // Wait for state to update, then submit
+    setTimeout(async () => {
+      setIsSubmitting(true)
+      setError(null)
+
+      const skipData = {
+        targetProject: targetProject?.repo || '',
+        similarProject: '',
+        similarMultiplier: 1.0,
+        reasoning: '',
+        wasSkipped: true,
+        assessmentTimestamp: new Date().toISOString()
+      }
+
+      try {
+        await submitScreen(user.address, screenType, screenId, skipData)
+        setLastSubmittedAt(new Date().toISOString())
+
+        // Auto-dismiss the success toast after 3 seconds
+        setTimeout(() => {
+          setLastSubmittedAt(null)
+        }, 3000)
+
+        // Move to next screen immediately
+        if (onNext) {
+          onNext({ alreadyCompleted: true })
+        }
+        setIsSubmitting(false)
+      } catch (error) {
+        console.error('Skip submission failed:', error)
+        setError('Failed to skip assessment. Please try again.')
+        setIsSubmitting(false)
+      }
+    }, 0)
   }
 
   const handleSuggestionClick = (suggestion) => {
@@ -324,7 +380,7 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
 
           {lastSubmittedAt && !error && (
             <div className="submission-status">
-              ✓ Comparison recorded
+              ✓ {wasSkipped ? 'Skipped' : 'Similar project recorded'}
             </div>
           )}
 
@@ -337,23 +393,37 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
             >
               ← Back
             </button>
-            {isCompleted && onForward ? (
-              <button
-                type="button"
-                onClick={onForward}
-                className="nav-button continue-button"
-              >
-                Continue →
-              </button>
-            ) : (
-              <button
-                type="submit"
-                className="nav-button continue-button"
-                disabled={isSubmitting || !selectedProject}
-              >
-                {isSubmitting ? 'Submitting...' : 'Submit Comparison'}
-              </button>
-            )}
+
+            <div className="right-buttons">
+              {!isCompleted && (
+                <button
+                  type="button"
+                  onClick={handleSkip}
+                  className="skip-button"
+                  disabled={isSubmitting}
+                >
+                  Skip this step
+                </button>
+              )}
+
+              {isCompleted && onForward ? (
+                <button
+                  type="button"
+                  onClick={onForward}
+                  className="nav-button continue-button"
+                >
+                  Continue →
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="nav-button continue-button"
+                  disabled={isSubmitting || !selectedProject}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Comparison'}
+                </button>
+              )}
+            </div>
           </div>
         </form>
       </div>
@@ -679,7 +749,28 @@ export function SimilarProjectsScreen({ targetProject: plannedTargetProject, onN
           background-color: #2c5282;
         }
 
-        .nav-button:disabled {
+        .right-buttons {
+          display: flex;
+          gap: 1rem;
+          align-items: center;
+        }
+
+        .skip-button {
+          background: none;
+          border: none;
+          color: #718096;
+          text-decoration: underline;
+          cursor: pointer;
+          font-size: 0.9rem;
+          padding: 0.5rem;
+        }
+
+        .skip-button:hover:not(:disabled) {
+          color: #4a5568;
+        }
+
+        .nav-button:disabled,
+        .skip-button:disabled {
           opacity: 0.5;
           cursor: not-allowed;
         }

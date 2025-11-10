@@ -10,20 +10,21 @@ import {
   formatRepoName
 } from '@/lib/eloHelpers'
 
-export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBack, onForward, isCompleted, onProjectChange }) {
+export function ComparisonScreen({ screenId: passedScreenId, projectPair: plannedProjectPair, onNext, onBack, onForward, isCompleted, onProjectChange }) {
   const { user } = useAuth()
   const [projectA, setProjectA] = useState(null)
   const [projectB, setProjectB] = useState(null)
   const [multiplier, setMultiplier] = useState('')
   const [selectedWinner, setSelectedWinner] = useState('')
   const [reasoning, setReasoning] = useState('')
+  const [wasSkipped, setWasSkipped] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastSubmittedAt, setLastSubmittedAt] = useState(null)
   const [error, setError] = useState(null)
 
   const screenType = 'comparison'
-  const comparisonId = projectA && projectB ? `${projectA.repo}-vs-${projectB.repo}` : 'pending'
-  const screenId = `comparison-${comparisonId}`
+  // Use the screenId passed from parent as-is (e.g., "comparison_1")
+  const screenId = passedScreenId || 'comparison_1'
   
   const data = {
     projectA: projectA?.repo || '',
@@ -31,6 +32,7 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
     winner: selectedWinner,
     multiplier: multiplier ? parseFloat(multiplier) : null,
     reasoning: reasoning,
+    wasSkipped,
     comparisonTimestamp: new Date().toISOString()
   }
 
@@ -102,6 +104,7 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
         setSelectedWinner(submission.data.winner || '')
         setMultiplier(submission.data.multiplier ? String(submission.data.multiplier) : '')
         setReasoning(submission.data.reasoning || '')
+        setWasSkipped(submission.data.wasSkipped || false)
         setLastSubmittedAt(submission.data.comparisonTimestamp)
       }
     } catch (error) {
@@ -119,42 +122,96 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
-    if (!selectedWinner || !multiplier) {
+
+    if (!wasSkipped && (!selectedWinner || !multiplier)) {
       setError('Please select a more valuable project and specify the multiplier')
       return
     }
 
-    const mult = parseFloat(multiplier)
-    if (mult < 1) {
-      setError('Multiplier must be at least 1.0 (equal value)')
-      return
+    if (!wasSkipped) {
+      const mult = parseFloat(multiplier)
+      if (mult < 1) {
+        setError('Multiplier must be at least 1.0 (equal value)')
+        return
+      }
     }
 
     setIsSubmitting(true)
     setError(null)
 
+    // Create explicit submit data with wasSkipped: false
+    const submitData = {
+      projectA: projectA?.repo || '',
+      projectB: projectB?.repo || '',
+      winner: selectedWinner,
+      multiplier: multiplier ? parseFloat(multiplier) : null,
+      reasoning: reasoning,
+      wasSkipped: false,  // Explicitly false when submitting
+      comparisonTimestamp: new Date().toISOString()
+    }
+
     try {
-      await submitScreen(user.address, screenType, screenId, data)
+      await submitScreen(user.address, screenType, screenId, submitData)
       setLastSubmittedAt(new Date().toISOString())
-      
+
       // Auto-dismiss the success toast after 3 seconds
       setTimeout(() => {
         setLastSubmittedAt(null)
       }, 3000)
-      
-      // After brief success display, move to next screen
-      setTimeout(() => {
-        if (onNext) {
-          onNext()
-        }
-        setIsSubmitting(false) // Reset submitting state after navigation
-      }, 1500)
+
+      // Move to next screen immediately
+      if (onNext) {
+        onNext({ alreadyCompleted: true })
+      }
+      setIsSubmitting(false)
     } catch (error) {
       console.error('Submission failed:', error)
       setError('Failed to submit comparison. Please try again.')
       setIsSubmitting(false)
     }
+  }
+
+  const handleSkip = async () => {
+    setWasSkipped(true)
+    setSelectedWinner('')
+    setMultiplier('')
+    setReasoning('')
+
+    // Wait for state to update, then submit
+    setTimeout(async () => {
+      setIsSubmitting(true)
+      setError(null)
+
+      const skipData = {
+        projectA: projectA?.repo || '',
+        projectB: projectB?.repo || '',
+        winner: '',
+        multiplier: null,
+        reasoning: '',
+        wasSkipped: true,
+        comparisonTimestamp: new Date().toISOString()
+      }
+
+      try {
+        await submitScreen(user.address, screenType, screenId, skipData)
+        setLastSubmittedAt(new Date().toISOString())
+
+        // Auto-dismiss the success toast after 3 seconds
+        setTimeout(() => {
+          setLastSubmittedAt(null)
+        }, 3000)
+
+        // Move to next screen immediately
+        if (onNext) {
+          onNext({ alreadyCompleted: true })
+        }
+        setIsSubmitting(false)
+      } catch (error) {
+        console.error('Skip submission failed:', error)
+        setError('Failed to skip comparison. Please try again.')
+        setIsSubmitting(false)
+      }
+    }, 0)
   }
 
   if (!projectA || !projectB) {
@@ -308,7 +365,7 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
 
           {lastSubmittedAt && !error && (
             <div className="submission-status">
-              ✓ Comparison recorded
+              ✓ {wasSkipped ? 'Skipped' : 'Comparison recorded'}
             </div>
           )}
 
@@ -321,23 +378,37 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
             >
               ← Back
             </button>
-            {isCompleted && onForward ? (
-              <button
-                type="button"
-                onClick={onForward}
-                className="nav-button continue-button"
-              >
-                Continue →
-              </button>
-            ) : (
-              <button
-                type="submit"
-                className="nav-button continue-button"
-                disabled={isSubmitting || !selectedWinner || !multiplier}
-              >
-                {isSubmitting ? 'Submitting...' : 'Submit Comparison'}
-              </button>
-            )}
+
+            <div className="right-buttons">
+              {!isCompleted && (
+                <button
+                  type="button"
+                  onClick={handleSkip}
+                  className="skip-button"
+                  disabled={isSubmitting}
+                >
+                  Skip this step
+                </button>
+              )}
+
+              {isCompleted && onForward ? (
+                <button
+                  type="button"
+                  onClick={onForward}
+                  className="nav-button continue-button"
+                >
+                  Continue →
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  className="nav-button continue-button"
+                  disabled={isSubmitting || !selectedWinner || !multiplier}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Comparison'}
+                </button>
+              )}
+            </div>
           </form>
         </div>
       </div>
@@ -629,7 +700,28 @@ export function ComparisonScreen({ projectPair: plannedProjectPair, onNext, onBa
           background-color: #2c5282;
         }
 
-        .nav-button:disabled {
+        .right-buttons {
+          display: flex;
+          gap: 1rem;
+          align-items: center;
+        }
+
+        .skip-button {
+          background: none;
+          border: none;
+          color: #718096;
+          text-decoration: underline;
+          cursor: pointer;
+          font-size: 0.9rem;
+          padding: 0.5rem;
+        }
+
+        .skip-button:hover:not(:disabled) {
+          color: #4a5568;
+        }
+
+        .nav-button:disabled,
+        .skip-button:disabled {
           opacity: 0.5;
           cursor: not-allowed;
         }

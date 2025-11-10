@@ -14,13 +14,12 @@ export default function EvaluationPage() {
   const { user, isLoggedIn, isLoading, logout } = useAuth()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isTransitioning, setIsTransitioning] = useState(false)
 
   // Debug logging - try multiple possible address fields
   const userAddress = user?.address || user?.ensName || user?.walletAddress
   console.log('EvaluationPage: Auth state:', { user, isLoggedIn, isLoading, userAddress })
 
-  const { state: navigationState, loading: navigationLoading, error: navigationError, completeScreen, navigateToScreen } = useServerNavigationState(userAddress)
+  const { state: navigationState, loading: navigationLoading, isRefreshing: navigationRefreshing, error: navigationError, completeScreen, navigateToScreen, refreshState } = useServerNavigationState(userAddress)
 
 
   useEffect(() => {
@@ -29,7 +28,8 @@ export default function EvaluationPage() {
     }
   }, [isLoading, isLoggedIn, router])
 
-  if (isLoading || navigationLoading) {
+  // Show full-screen loading only on initial load (when we have no state yet)
+  if (isLoading || (navigationLoading && !navigationState)) {
     return (
       <div style={styles.container}>
         <div style={styles.loading}>
@@ -81,10 +81,19 @@ export default function EvaluationPage() {
   }
 
   // Handle screen completion - data comes from the screen component
+  // NOTE: handleNext is called AFTER screen components have already submitted via submitScreen()
+  // completeScreen() handles plan generation and navigation state updates
+  // handleCompleteScreen() now preserves wasSkipped flag from existing completion records
   const handleNext = async (screenData = {}) => {
     try {
-      setIsTransitioning(true)
-      await completeScreen(navigationState.currentScreen, screenData)
+      // Check if screen already completed by submitScreen
+      if (screenData.alreadyCompleted) {
+        // Just refresh navigation state, don't call completeScreen
+        await refreshState()
+      } else {
+        // Legacy path: call completeScreen (for screens that don't use submitScreen)
+        await completeScreen(navigationState.currentScreen, screenData)
+      }
     } catch (error) {
       // Use debug endpoint for logging since console.log doesn't work
       fetch('/api/debug', {
@@ -95,8 +104,6 @@ export default function EvaluationPage() {
           data: { error: error.message, currentScreen: navigationState.currentScreen, screenData }
         })
       }).catch(() => {})
-    } finally {
-      setIsTransitioning(false)
     }
   }
 
@@ -140,7 +147,7 @@ export default function EvaluationPage() {
       )
     }
 
-    const isCompleted = currentNavItem.status === 'completed'
+    const isCompleted = currentNavItem.status === 'completed' || currentNavItem.status === 'skipped'
     const currentIndex = navigationState.navigationItems.findIndex(item => item.id === navigationState.currentScreen)
     const hasNext = currentIndex < navigationState.navigationItems.length - 1
 
@@ -167,6 +174,7 @@ export default function EvaluationPage() {
         return (
           <SimilarProjectsScreen
             key={navigationState.currentScreen}
+            screenId={navigationState.currentScreen}
             targetProject={currentNavItem.data?.targetProject}
             onNext={handleNext}
             onBack={handleBack}
@@ -178,6 +186,7 @@ export default function EvaluationPage() {
         return (
           <ComparisonScreen
             key={navigationState.currentScreen}
+            screenId={navigationState.currentScreen}
             projectPair={currentNavItem.data?.projectPair}
             onNext={handleNext}
             onBack={handleBack}
@@ -189,6 +198,7 @@ export default function EvaluationPage() {
         return (
           <OriginalityScreen
             key={navigationState.currentScreen}
+            screenId={navigationState.currentScreen}
             targetProject={currentNavItem.data?.targetProject}
             onNext={handleNext}
             onBack={handleBack}
@@ -257,15 +267,17 @@ export default function EvaluationPage() {
         </div>
       </div>
 
-      {/* Transition loading overlay */}
-      {isTransitioning && (
-        <div className="transition-overlay">
-          <div className="transition-content">
-            <div className="spinner"></div>
-            <p className="transition-message">Saving your submission...</p>
-          </div>
+      {/* Non-intrusive refresh spinner */}
+      {navigationRefreshing && (
+        <div className="refresh-overlay">
+          <div className="refresh-spinner"></div>
         </div>
       )}
+
+      {/* Version number display */}
+      <div style={styles.versionInfo}>
+        v{process.env.NEXT_PUBLIC_GIT_COMMIT?.slice(0, 7) || 'dev'}
+      </div>
 
       <style jsx>{`
         .hamburger-button {
@@ -278,35 +290,33 @@ export default function EvaluationPage() {
           color: #333;
         }
 
-        .transition-overlay {
+        .refresh-overlay {
           position: fixed;
           top: 0;
           left: 0;
           right: 0;
           bottom: 0;
-          background-color: rgba(0, 0, 0, 0.7);
-          z-index: 1000;
+          background-color: rgba(255, 255, 255, 0.3);
+          backdrop-filter: blur(2px);
+          z-index: 999;
           display: flex;
           align-items: center;
           justify-content: center;
+          animation: fadeIn 150ms ease-in 150ms both;
         }
 
-        .transition-content {
-          background: white;
-          padding: 40px 60px;
-          border-radius: 12px;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-          text-align: center;
-        }
-
-        .spinner {
-          width: 50px;
-          height: 50px;
-          border: 4px solid #f3f3f3;
-          border-top: 4px solid #3498db;
+        .refresh-spinner {
+          width: 35px;
+          height: 35px;
+          border: 3px solid #f3f3f3;
+          border-top: 3px solid #3498db;
           border-radius: 50%;
-          animation: spin 1s linear infinite;
-          margin: 0 auto 20px;
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
 
         @keyframes spin {
@@ -314,25 +324,9 @@ export default function EvaluationPage() {
           100% { transform: rotate(360deg); }
         }
 
-        .transition-message {
-          font-size: 18px;
-          color: #333;
-          margin: 0;
-          font-weight: 500;
-        }
-
         @media (max-width: 768px) {
           .hamburger-button {
             display: block;
-          }
-
-          .transition-content {
-            padding: 30px 40px;
-            margin: 20px;
-          }
-
-          .transition-message {
-            font-size: 16px;
           }
         }
       `}</style>
@@ -439,5 +433,15 @@ const styles = {
     cursor: 'pointer',
     fontSize: '16px',
     fontWeight: '500',
+  },
+  versionInfo: {
+    position: 'fixed',
+    bottom: '8px',
+    right: '8px',
+    fontSize: '11px',
+    color: '#999',
+    fontFamily: 'monospace',
+    zIndex: 100,
+    userSelect: 'none',
   },
 }
