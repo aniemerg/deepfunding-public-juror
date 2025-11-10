@@ -91,26 +91,32 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
   }
 
   if (!plan) {
-    // Return a stub plan with just background and range_definition
+    // Return a stub plan with background, range_definition, and repo_selection
     // Check completion and in-progress status for these screens
     const backgroundCompletedData = await kv.get(`user:${userAddress}:completed:background`)
     const rangeCompletedData = await kv.get(`user:${userAddress}:completed:range_definition`)
+    const repoSelectionCompletedData = await kv.get(`user:${userAddress}:completed:repo_selection`)
     const backgroundInProgress = await kv.get(`user:${userAddress}:in-progress:background`)
     const rangeInProgress = await kv.get(`user:${userAddress}:in-progress:range_definition`)
+    const repoSelectionInProgress = await kv.get(`user:${userAddress}:in-progress:repo_selection`)
 
     // Parse completion data to check for skip status
     const backgroundCompleted = !!backgroundCompletedData
     const rangeCompleted = !!rangeCompletedData
+    const repoSelectionCompleted = !!repoSelectionCompletedData
     const backgroundSkipped = backgroundCompletedData ? JSON.parse(backgroundCompletedData).wasSkipped : false
     const rangeSkipped = rangeCompletedData ? JSON.parse(rangeCompletedData).wasSkipped : false
+    const repoSelectionSkipped = repoSelectionCompletedData ? JSON.parse(repoSelectionCompletedData).wasSkipped : false
 
-    // Determine current screen first
+    // Determine current screen
     let currentScreen = 'background'
     if (backgroundCompleted && !rangeCompleted) {
       currentScreen = 'range_definition'
-    } else if (rangeCompleted) {
-      // Both completed but no plan yet - stay on range_definition
-      currentScreen = 'range_definition'
+    } else if (rangeCompleted && !repoSelectionCompleted) {
+      currentScreen = 'repo_selection'
+    } else if (repoSelectionCompleted) {
+      // All three completed but no plan yet - stay on repo_selection
+      currentScreen = 'repo_selection'
     }
 
     // Mark current screen as in-progress if not already completed
@@ -120,6 +126,10 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
       }))
     } else if (currentScreen === 'range_definition' && !rangeCompleted) {
       await kv.put(`user:${userAddress}:in-progress:range_definition`, JSON.stringify({
+        startedAt: new Date().toISOString()
+      }))
+    } else if (currentScreen === 'repo_selection' && !repoSelectionCompleted) {
+      await kv.put(`user:${userAddress}:in-progress:repo_selection`, JSON.stringify({
         startedAt: new Date().toISOString()
       }))
     }
@@ -144,6 +154,12 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
         screenType: 'range_definition',
         text: 'Personal Scale',
         status: getStatus('range_definition', rangeCompleted, rangeSkipped, rangeInProgress)
+      },
+      {
+        id: 'repo_selection',
+        screenType: 'repo_selection',
+        text: 'Repo Selection',
+        status: getStatus('repo_selection', repoSelectionCompleted, repoSelectionSkipped, repoSelectionInProgress)
       }
     ]
 
@@ -163,6 +179,7 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
   const screenChecks = [
     'background',
     'range_definition',
+    'repo_selection',
     ...plan.similarProjects.map((_, i) => `similar_projects_${i + 1}`),
     ...plan.comparisons.map((_, i) => `comparison_${i + 1}`)
   ]
@@ -279,6 +296,13 @@ function createNavigationFromPlan(plan, completedScreens, skippedScreens, inProg
       text: 'Range Definition',
       status: getStatus('range_definition'),
       data: null
+    },
+    {
+      id: 'repo_selection',
+      screenType: 'repo_selection',
+      text: 'Repo Selection',
+      status: getStatus('repo_selection'),
+      data: null
     }
   ]
 
@@ -371,28 +395,65 @@ async function handleCompleteScreen(userAddress, screenId, data, kv) {
     data: data
   }))
   
-  // 2. If completing range_definition and no plan exists, generate the full plan
-  if (screenId === 'range_definition') {
+  // 2. If completing repo_selection and no plan exists, generate the full plan
+  if (screenId === 'repo_selection') {
     const existingPlan = await kv.get(`user:${userAddress}:evaluation-plan`)
     if (!existingPlan) {
-      const { getRandomProject, getRandomPair, getDiversePair, getRandomProjectsForOriginality } = await import('@/lib/eloHelpers')
-
-      // Generate evaluation plan: 2 similar projects, 10 comparisons, 3 originality
-      const similarProjects = [
-        getRandomProject(),
-        getRandomProject()
-      ]
-
-      const comparisons = []
-      for (let i = 0; i < 10; i++) {
-        const pair = i % 2 === 0 ? getRandomPair() : getDiversePair()
-        comparisons.push(pair)
+      // Load the selected repos from completion data
+      const repoSelectionData = await kv.get(`user:${userAddress}:completed:repo_selection`)
+      if (!repoSelectionData) {
+        console.error('No repo selection data found when generating plan')
+        throw new Error('Repo selection data not found')
       }
 
-      const originalityProjects = getRandomProjectsForOriginality(3)
+      const repoSelection = JSON.parse(repoSelectionData)
+      const selectedRepoNames = repoSelection.data.finalSelectedRepos || []
+
+      if (selectedRepoNames.length < 10) {
+        console.error('Not enough selected repos for plan generation:', selectedRepoNames.length)
+        throw new Error('Need at least 10 selected repos to generate plan')
+      }
+
+      // Convert repo names to project objects
+      const { getProjectByRepo, getRandomPairFrom, getDiversePairFrom, getRandomProjectsForOriginalityFrom } = await import('@/lib/eloHelpers')
+      const selectedRepos = selectedRepoNames.map(repo => getProjectByRepo(repo)).filter(p => p)
+
+      // Get the most/least valuable repos for exclusion
+      const mostValuable = repoSelection.data.mostValuableFromScale
+      const leastValuable = repoSelection.data.leastValuableFromScale
+
+      // Generate evaluation plan: 2 similar projects, 10 comparisons, 3 originality
+      // All selected from the user's chosen repos
+      const similarProjects = [
+        selectedRepos[Math.floor(Math.random() * selectedRepos.length)],
+        selectedRepos[Math.floor(Math.random() * selectedRepos.length)]
+      ]
+
+      // Generate comparisons, excluding most/least valuable being compared against each other
+      const comparisons = []
+      for (let i = 0; i < 10; i++) {
+        let pair
+        let attempts = 0
+        // Try to get a valid pair (not most vs least)
+        do {
+          pair = i % 2 === 0 ? getRandomPairFrom(selectedRepos) : getDiversePairFrom(selectedRepos)
+          attempts++
+        } while (
+          pair &&
+          ((pair[0].repo === mostValuable && pair[1].repo === leastValuable) ||
+           (pair[0].repo === leastValuable && pair[1].repo === mostValuable)) &&
+          attempts < 20 // Prevent infinite loop
+        )
+        if (pair) {
+          comparisons.push(pair)
+        }
+      }
+
+      const originalityProjects = getRandomProjectsForOriginalityFrom(selectedRepos, 3)
 
       const plan = {
-        version: 1,  // Schema version for future migrations
+        version: 2,  // Schema version (v2 includes selectedRepos)
+        selectedRepos: selectedRepoNames,  // Store the repo names
         similarProjects,
         comparisons,
         originalityProjects,
@@ -402,7 +463,7 @@ async function handleCompleteScreen(userAddress, screenId, data, kv) {
 
       // Save the generated plan
       await kv.put(`user:${userAddress}:evaluation-plan`, JSON.stringify(plan))
-      console.log('Generated full evaluation plan after range_definition for user:', userAddress)
+      console.log('Generated full evaluation plan after repo_selection for user:', userAddress)
     }
   }
   

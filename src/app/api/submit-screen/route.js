@@ -2,12 +2,13 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { cookies } from 'next/headers';
 import { getIronSession } from 'iron-session';
 import { sessionOptions } from '@/lib/session';
-import { 
+import {
   submitBackgroundData,
   submitPersonalScaleData,
   submitSimilarProjectData,
   submitComparisonData,
-  submitOriginalityData
+  submitOriginalityData,
+  submitRepoSelectionData
 } from "@/lib/googleSheets";
 
 export async function POST(req) {
@@ -98,6 +99,18 @@ export async function POST(req) {
         }
         break;
 
+      case 'repo_selection':
+        if (!isSkipped) {
+          await submitRepoSelectionData(env, {
+            ensName,
+            initialRepos: payload.initialRepos.join(','),
+            vetoedRepos: payload.vetoedRepos.join(','),
+            finalRepos: payload.finalSelectedRepos.join(','),
+            reasoning: payload.reasoning || ''
+          });
+        }
+        break;
+
       default:
         // For unknown screen types, log an error but don't fail
         console.error(`Unknown screen type: ${dataType}`);
@@ -184,6 +197,8 @@ function getScreenIdFromDataType(dataType, id, payload) {
       // Legacy: Parse originality number from id (e.g., "originality-1" -> "originality_1")
       const originalityNumber = parseInt(id.split('-').pop()) || 1;
       return `originality_${originalityNumber}`
+    case 'repo_selection':
+      return 'repo_selection'
     default:
       return null
   }

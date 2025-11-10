@@ -93,3 +93,121 @@ export function formatRepoName(repo) {
 export function getProjectDisplayName(repo) {
   return repo;
 }
+
+// === Repo Selection Functions ===
+
+// Generate initial repo selection (10 projects including locked ones)
+export function getInitialRepoSelection(mostValuableRepo, leastValuableRepo) {
+  const mostValuable = getProjectByRepo(mostValuableRepo);
+  const leastValuable = getProjectByRepo(leastValuableRepo);
+
+  if (!mostValuable || !leastValuable) {
+    console.error('Invalid repos for initial selection:', mostValuableRepo, leastValuableRepo);
+    return [];
+  }
+
+  // Start with the locked projects
+  const selected = [mostValuable, leastValuable];
+
+  // Get 8 more random projects (excluding the locked ones)
+  const available = ELO_PROJECTS.filter(p =>
+    p.repo !== mostValuableRepo && p.repo !== leastValuableRepo
+  );
+
+  const shuffled = [...available].sort(() => Math.random() - 0.5);
+  const additional = shuffled.slice(0, 8);
+
+  return [...selected, ...additional];
+}
+
+// Get a random project excluding specific repos
+export function getRandomRepoExcluding(excludeRepos = []) {
+  const available = ELO_PROJECTS.filter(p => !excludeRepos.includes(p.repo));
+
+  if (available.length === 0) {
+    console.error('No available repos after exclusion');
+    return null;
+  }
+
+  const index = Math.floor(Math.random() * available.length);
+  return available[index];
+}
+
+// Get random pair from a list of selected repos
+export function getRandomPairFrom(selectedRepos) {
+  if (!selectedRepos || selectedRepos.length < 2) {
+    console.error('Need at least 2 repos for pair selection');
+    return null;
+  }
+
+  // If selectedRepos is array of project objects, use directly
+  // If array of strings (repo names), convert to project objects
+  const projects = selectedRepos[0]?.repo
+    ? selectedRepos
+    : selectedRepos.map(repo => getProjectByRepo(repo)).filter(p => p);
+
+  if (projects.length < 2) {
+    console.error('Not enough valid projects for pair');
+    return null;
+  }
+
+  const shuffled = [...projects].sort(() => Math.random() - 0.5);
+  return [shuffled[0], shuffled[1]];
+}
+
+// Get diverse pair (different weight ranges) from selected repos
+export function getDiversePairFrom(selectedRepos) {
+  if (!selectedRepos || selectedRepos.length < 2) {
+    console.error('Need at least 2 repos for diverse pair');
+    return null;
+  }
+
+  // Convert to project objects if needed
+  const projects = selectedRepos[0]?.repo
+    ? selectedRepos
+    : selectedRepos.map(repo => getProjectByRepo(repo)).filter(p => p);
+
+  if (projects.length < 2) {
+    console.error('Not enough valid projects for diverse pair');
+    return null;
+  }
+
+  // Sort by weight
+  const sorted = [...projects].sort((a, b) => b.weight - a.weight);
+
+  // If less than 4 projects, just return random pair
+  if (sorted.length < 4) {
+    return [sorted[0], sorted[sorted.length - 1]];
+  }
+
+  // Split into top and bottom halves
+  const midpoint = Math.floor(sorted.length / 2);
+  const topHalf = sorted.slice(0, midpoint);
+  const bottomHalf = sorted.slice(midpoint);
+
+  const project1 = topHalf[Math.floor(Math.random() * topHalf.length)];
+  const project2 = bottomHalf[Math.floor(Math.random() * bottomHalf.length)];
+
+  return [project1, project2];
+}
+
+// Get random projects for originality from selected repos
+export function getRandomProjectsForOriginalityFrom(selectedRepos, count = 3) {
+  if (!selectedRepos || selectedRepos.length < count) {
+    console.error(`Need at least ${count} repos for originality selection`);
+    return [];
+  }
+
+  // Convert to project objects if needed
+  const projects = selectedRepos[0]?.repo
+    ? selectedRepos
+    : selectedRepos.map(repo => getProjectByRepo(repo)).filter(p => p);
+
+  if (projects.length < count) {
+    console.error('Not enough valid projects for originality');
+    return projects; // Return what we have
+  }
+
+  const shuffled = [...projects].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}

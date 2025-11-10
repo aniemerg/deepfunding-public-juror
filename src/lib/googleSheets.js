@@ -238,6 +238,26 @@ export async function submitOriginalityData(env, { ensName, targetRepo, original
   return await appendToSheet(env, accessToken, sheetName, values);
 }
 
+// Submit repo selection data
+export async function submitRepoSelectionData(env, { ensName, initialRepos, vetoedRepos, finalRepos, reasoning }) {
+  const accessToken = await getAccessToken(env);
+  const submissionId = generateSubmissionId();
+  const sheetName = "RepoSelection";
+
+  const values = [
+    submissionId,
+    1, // version
+    ensName,
+    new Date().toISOString(),
+    initialRepos, // comma-separated string
+    vetoedRepos, // comma-separated string
+    finalRepos, // comma-separated string
+    reasoning || ''
+  ];
+
+  return await appendToSheet(env, accessToken, sheetName, values);
+}
+
 // Generic append function
 async function appendToSheet(env, accessToken, sheetName, values) {
   const sheetId = getSheetId(env);

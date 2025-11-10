@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { BackgroundScreen } from '@/components/BackgroundScreen'
 import { RangeDefinitionScreen } from '@/components/RangeDefinitionScreen'
+import { RepoSelectionScreen } from '@/components/RepoSelectionScreen'
 import { SimilarProjectsScreen } from '@/components/SimilarProjectsScreen'
 import { ComparisonScreen } from '@/components/ComparisonScreen'
 import { OriginalityScreen } from '@/components/OriginalityScreen'
@@ -164,6 +165,15 @@ export default function EvaluationPage() {
       case 'range_definition':
         return (
           <RangeDefinitionScreen
+            onNext={handleNext}
+            onBack={handleBack}
+            onForward={hasNext ? handleForward : null}
+            isCompleted={isCompleted}
+          />
+        )
+      case 'repo_selection':
+        return (
+          <RepoSelectionScreen
             onNext={handleNext}
             onBack={handleBack}
             onForward={hasNext ? handleForward : null}
