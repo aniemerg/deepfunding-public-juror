@@ -214,3 +214,34 @@ export function getRandomProjectsForOriginalityFrom(selectedRepos, count = 3) {
   const shuffled = [...projects].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, count);
 }
+
+// Get initial repo selection from top 3 projects (locked) + 7 random
+export function getInitialRepoSelectionFromTopProjects(topThreeRepos) {
+  // Validate input
+  if (!topThreeRepos || topThreeRepos.length !== 3) {
+    console.error('Invalid top three repos:', topThreeRepos);
+    // Fallback: return 10 random projects
+    const shuffled = [...ELO_PROJECTS].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 10);
+  }
+
+  // Convert repo names to project objects if needed
+  const lockedProjects = topThreeRepos.map(repo => {
+    return typeof repo === 'string' ? getProjectByRepo(repo) : repo;
+  }).filter(p => p);
+
+  if (lockedProjects.length !== 3) {
+    console.error('Could not find all three projects');
+    // Fallback: return 10 random projects
+    const shuffled = [...ELO_PROJECTS].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, 10);
+  }
+
+  // Get 7 more random projects (excluding the locked three)
+  const excludeRepos = lockedProjects.map(p => p.repo);
+  const available = ELO_PROJECTS.filter(p => !excludeRepos.includes(p.repo));
+  const shuffled = [...available].sort(() => Math.random() - 0.5);
+  const additionalProjects = shuffled.slice(0, 7);
+
+  return [...lockedProjects, ...additionalProjects];
+}
