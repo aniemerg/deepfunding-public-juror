@@ -4,6 +4,9 @@
 
 import { ELO_PROJECTS } from './eloDataset'
 
+// Re-export ELO_PROJECTS for use in other modules
+export { ELO_PROJECTS }
+
 // Get all projects as an array of repo names
 export function getAllProjects() {
   return ELO_PROJECTS.map(p => p.repo);

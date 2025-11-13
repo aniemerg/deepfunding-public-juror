@@ -238,6 +238,25 @@ export async function submitOriginalityData(env, { ensName, targetRepo, original
   return await appendToSheet(env, accessToken, sheetName, values);
 }
 
+// Submit top projects data
+export async function submitTopProjectsData(env, { ensName, selectedRepos, screenOpenedAt, reposShownOrder }) {
+  const accessToken = await getAccessToken(env);
+  const submissionId = generateSubmissionId();
+  const sheetName = "TopProjects";
+
+  const values = [
+    submissionId,
+    1, // version
+    ensName,
+    screenOpenedAt,
+    new Date().toISOString(), // submission timestamp
+    selectedRepos, // comma-separated string
+    reposShownOrder // comma-separated string of all repos in order shown
+  ];
+
+  return await appendToSheet(env, accessToken, sheetName, values);
+}
+
 // Submit repo selection data
 export async function submitRepoSelectionData(env, { ensName, initialRepos, vetoedRepos, finalRepos, reasoning }) {
   const accessToken = await getAccessToken(env);

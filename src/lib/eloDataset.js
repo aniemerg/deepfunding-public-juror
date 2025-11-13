@@ -1,6 +1,6 @@
 // ELO Dataset - Project Rankings Data
 // Auto-generated from design/elo.csv - DO NOT EDIT MANUALLY
-// Run 'npm run generate-elo' to regenerate this file
+// Run 'npm run generate-datasets' to regenerate this file
 //
 // NOTE: All helper functions are in eloHelpers.js to prevent them from being overwritten
 
