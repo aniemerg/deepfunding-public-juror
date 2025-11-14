@@ -1,6 +1,6 @@
 // Session version - increment this when making breaking changes to session structure
 // This will automatically invalidate old sessions and force re-authentication
-export const SESSION_VERSION = 3
+export const SESSION_VERSION = 4
 
 export const sessionOptions = {
   cookieName: 'jury-session',
