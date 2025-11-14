@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { BackgroundScreen } from '@/components/BackgroundScreen'
+import { TopProjectsScreen } from '@/components/TopProjectsScreen'
 import { RangeDefinitionScreen } from '@/components/RangeDefinitionScreen'
 import { RepoSelectionScreen } from '@/components/RepoSelectionScreen'
 import { SimilarProjectsScreen } from '@/components/SimilarProjectsScreen'
@@ -156,6 +157,15 @@ export default function EvaluationPage() {
       case 'background':
         return (
           <BackgroundScreen
+            onNext={handleNext}
+            onBack={handleBack}
+            onForward={hasNext ? handleForward : null}
+            isCompleted={isCompleted}
+          />
+        )
+      case 'top_projects':
+        return (
+          <TopProjectsScreen
             onNext={handleNext}
             onBack={handleBack}
             onForward={hasNext ? handleForward : null}

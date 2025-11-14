@@ -8,7 +8,8 @@ import {
   submitSimilarProjectData,
   submitComparisonData,
   submitOriginalityData,
-  submitRepoSelectionData
+  submitRepoSelectionData,
+  submitTopProjectsData
 } from "@/lib/googleSheets";
 
 export async function POST(req) {
@@ -38,6 +39,17 @@ export async function POST(req) {
           await submitBackgroundData(env, {
             ensName,
             backgroundText: payload.backgroundText
+          });
+        }
+        break;
+
+      case 'top_projects':
+        if (!isSkipped) {
+          await submitTopProjectsData(env, {
+            ensName,
+            selectedRepos: payload.selectedRepos.join(','),
+            screenOpenedAt: payload.screenOpenedAt,
+            reposShownOrder: payload.reposShownOrder.join(',')
           });
         }
         break;
@@ -171,6 +183,8 @@ function getScreenIdFromDataType(dataType, id, payload) {
   switch (dataType) {
     case 'background':
       return 'background'
+    case 'top_projects':
+      return 'top_projects'
     case 'personal_scale':
       return 'range_definition'
     case 'similar_projects':

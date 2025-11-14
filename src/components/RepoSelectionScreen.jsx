@@ -3,14 +3,14 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useAutosave, useDataSubmission } from '@/hooks/useAutoSave'
-import { getInitialRepoSelection, getRandomRepoExcluding, formatRepoName } from '@/lib/eloHelpers'
+import { getRandomRepoExcluding, formatRepoName } from '@/lib/eloHelpers'
 
 export function RepoSelectionScreen({ onNext, onBack, onForward, isCompleted }) {
   const { user } = useAuth()
   const [selectedRepos, setSelectedRepos] = useState([])
   const [initialRepos, setInitialRepos] = useState([])
   const [vetoedRepos, setVetoedRepos] = useState([])
-  const [lockedRepos, setLockedRepos] = useState({ most: null, least: null })
+  const [lockedRepos, setLockedRepos] = useState([]) // Array of 3 repo names
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastSubmittedAt, setLastSubmittedAt] = useState(null)
   const [error, setError] = useState(null)
@@ -22,8 +22,7 @@ export function RepoSelectionScreen({ onNext, onBack, onForward, isCompleted }) 
     initialRepos: initialRepos.map(p => p.repo),
     vetoedRepos: vetoedRepos,
     finalSelectedRepos: selectedRepos.map(p => p.repo),
-    mostValuableFromScale: lockedRepos.most,
-    leastValuableFromScale: lockedRepos.least,
+    lockedReposFromTopProjects: lockedRepos, // Array of 3 repo names
     timestamp: new Date().toISOString()
   }
 
@@ -38,18 +37,28 @@ export function RepoSelectionScreen({ onNext, onBack, onForward, isCompleted }) 
 
   const loadExistingDataOrInitialize = async () => {
     try {
-      // First, get the Personal Scale data to know the locked repos
-      const rangeDefSubmission = await getSubmissionStatus(user.address, 'personal_scale', 'range-definition')
+      // Get Top Projects data to know the locked repos
+      const topProjectsSubmission = await getSubmissionStatus(user.address, 'top_projects', 'top-projects')
 
-      if (!rangeDefSubmission.exists || !rangeDefSubmission.data) {
-        setError('Please complete the Personal Scale screen first')
-        return
+      let topThreeArray = []
+      if (topProjectsSubmission.exists && topProjectsSubmission.data) {
+        // Get the 3 selected repos from Top Projects
+        const topThreeRepoNames = topProjectsSubmission.data.selectedRepos
+
+        // Handle both array and comma-separated string formats
+        if (Array.isArray(topThreeRepoNames)) {
+          topThreeArray = topThreeRepoNames
+        } else if (typeof topThreeRepoNames === 'string') {
+          topThreeArray = topThreeRepoNames.split(',').map(r => r.trim())
+        }
+
+        if (topThreeArray.length !== 3) {
+          console.warn('Top Projects did not have exactly 3 projects. Using fallback.')
+          topThreeArray = []
+        }
       }
 
-      const mostValuable = rangeDefSubmission.data.mostValuableProject
-      const leastValuable = rangeDefSubmission.data.leastValuableProject
-
-      setLockedRepos({ most: mostValuable, least: leastValuable })
+      setLockedRepos(topThreeArray)
 
       // Check if repo selection was already done
       const submission = await getSubmissionStatus(user.address, screenType, screenId)
@@ -67,8 +76,9 @@ export function RepoSelectionScreen({ onNext, onBack, onForward, isCompleted }) 
         setSelectedRepos(final.map(repo => getProjectByRepo(repo)).filter(p => p))
         setLastSubmittedAt(submission.data.timestamp)
       } else {
-        // Generate initial selection
-        const initial = getInitialRepoSelection(mostValuable, leastValuable)
+        // Generate initial selection from top 3 (or fallback to random 10)
+        const { getInitialRepoSelectionFromTopProjects } = await import('@/lib/eloHelpers')
+        const initial = getInitialRepoSelectionFromTopProjects(topThreeArray)
         setInitialRepos(initial)
         setSelectedRepos(initial)
       }
@@ -81,8 +91,8 @@ export function RepoSelectionScreen({ onNext, onBack, onForward, isCompleted }) 
   }
 
   const handleDismiss = (repoToRemove) => {
-    // Can't remove locked repos
-    if (repoToRemove === lockedRepos.most || repoToRemove === lockedRepos.least) {
+    // Can't remove any of the 3 locked repos
+    if (lockedRepos.includes(repoToRemove)) {
       return
     }
 
@@ -147,7 +157,7 @@ export function RepoSelectionScreen({ onNext, onBack, onForward, isCompleted }) 
   }
 
   const isLocked = (repo) => {
-    return repo === lockedRepos.most || repo === lockedRepos.least
+    return lockedRepos.includes(repo)
   }
 
   if (!isInitialized) {
@@ -172,8 +182,8 @@ export function RepoSelectionScreen({ onNext, onBack, onForward, isCompleted }) 
 
         <div className="info-section">
           <p>
-            We've pre-selected projects including your most and least valuable choices from the previous step.
-            You can remove unfamiliar projects (except the two locked ones).
+            We've pre-selected projects including your top 3 choices from the Top Projects screen.
+            You can remove unfamiliar projects (except the three locked ones).
           </p>
           <div className="stats">
             <span>Projects selected: {selectedRepos.length}/10</span>
@@ -188,7 +198,7 @@ export function RepoSelectionScreen({ onNext, onBack, onForward, isCompleted }) 
               <div className="project-header">
                 <div className="project-name">{project.repo}</div>
                 {isLocked(project.repo) ? (
-                  <div className="lock-icon" title="From Personal Scale - cannot remove">
+                  <div className="lock-icon" title="From Top Projects - cannot remove">
                     🔒
                   </div>
                 ) : (
@@ -200,13 +210,6 @@ export function RepoSelectionScreen({ onNext, onBack, onForward, isCompleted }) 
                   >
                     ✕
                   </button>
-                )}
-              </div>
-              <div className="project-meta">
-                {isLocked(project.repo) && (
-                  <span className="locked-label">
-                    {project.repo === lockedRepos.most ? 'Most Valuable' : 'Least Valuable'}
-                  </span>
                 )}
               </div>
             </div>

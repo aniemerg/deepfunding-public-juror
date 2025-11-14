@@ -8,10 +8,11 @@ import { sessionOptions } from '@/lib/session'
 export async function POST() {
   const cookieStore = await cookies()
   const session = await getIronSession(cookieStore, sessionOptions)
-  
+
   // Clear session data
   session.user = null
   session.siweNonce = null
+  session.version = null
   await session.save()
 
   return NextResponse.json({ success: true })

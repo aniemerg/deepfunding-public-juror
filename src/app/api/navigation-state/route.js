@@ -91,28 +91,28 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
   }
 
   if (!plan) {
-    // Return a stub plan with background, range_definition, and repo_selection
+    // Return a stub plan with background, top_projects, and repo_selection (range_definition removed)
     // Check completion and in-progress status for these screens
     const backgroundCompletedData = await kv.get(`user:${userAddress}:completed:background`)
-    const rangeCompletedData = await kv.get(`user:${userAddress}:completed:range_definition`)
+    const topProjectsCompletedData = await kv.get(`user:${userAddress}:completed:top_projects`)
     const repoSelectionCompletedData = await kv.get(`user:${userAddress}:completed:repo_selection`)
     const backgroundInProgress = await kv.get(`user:${userAddress}:in-progress:background`)
-    const rangeInProgress = await kv.get(`user:${userAddress}:in-progress:range_definition`)
+    const topProjectsInProgress = await kv.get(`user:${userAddress}:in-progress:top_projects`)
     const repoSelectionInProgress = await kv.get(`user:${userAddress}:in-progress:repo_selection`)
 
     // Parse completion data to check for skip status
     const backgroundCompleted = !!backgroundCompletedData
-    const rangeCompleted = !!rangeCompletedData
+    const topProjectsCompleted = !!topProjectsCompletedData
     const repoSelectionCompleted = !!repoSelectionCompletedData
     const backgroundSkipped = backgroundCompletedData ? JSON.parse(backgroundCompletedData).wasSkipped : false
-    const rangeSkipped = rangeCompletedData ? JSON.parse(rangeCompletedData).wasSkipped : false
+    const topProjectsSkipped = topProjectsCompletedData ? JSON.parse(topProjectsCompletedData).wasSkipped : false
     const repoSelectionSkipped = repoSelectionCompletedData ? JSON.parse(repoSelectionCompletedData).wasSkipped : false
 
-    // Determine current screen
+    // Determine current screen (skip range_definition)
     let currentScreen = 'background'
-    if (backgroundCompleted && !rangeCompleted) {
-      currentScreen = 'range_definition'
-    } else if (rangeCompleted && !repoSelectionCompleted) {
+    if (backgroundCompleted && !topProjectsCompleted) {
+      currentScreen = 'top_projects'
+    } else if (topProjectsCompleted && !repoSelectionCompleted) {
       currentScreen = 'repo_selection'
     } else if (repoSelectionCompleted) {
       // All three completed but no plan yet - stay on repo_selection
@@ -124,8 +124,8 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
       await kv.put(`user:${userAddress}:in-progress:background`, JSON.stringify({
         startedAt: new Date().toISOString()
       }))
-    } else if (currentScreen === 'range_definition' && !rangeCompleted) {
-      await kv.put(`user:${userAddress}:in-progress:range_definition`, JSON.stringify({
+    } else if (currentScreen === 'top_projects' && !topProjectsCompleted) {
+      await kv.put(`user:${userAddress}:in-progress:top_projects`, JSON.stringify({
         startedAt: new Date().toISOString()
       }))
     } else if (currentScreen === 'repo_selection' && !repoSelectionCompleted) {
@@ -150,10 +150,10 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
         status: getStatus('background', backgroundCompleted, backgroundSkipped, backgroundInProgress)
       },
       {
-        id: 'range_definition',
-        screenType: 'range_definition',
-        text: 'Personal Scale',
-        status: getStatus('range_definition', rangeCompleted, rangeSkipped, rangeInProgress)
+        id: 'top_projects',
+        screenType: 'top_projects',
+        text: 'Top Projects',
+        status: getStatus('top_projects', topProjectsCompleted, topProjectsSkipped, topProjectsInProgress)
       },
       {
         id: 'repo_selection',
@@ -175,18 +175,22 @@ async function deriveNavigationStateFromKV(userAddress, kv) {
   const skippedScreens = new Set()
   const inProgressScreens = new Set()
 
-  // Check each screen type
+  // Check each screen type (range_definition and similar_projects removed)
   const screenChecks = [
     'background',
-    'range_definition',
+    'top_projects',
     'repo_selection',
-    ...plan.similarProjects.map((_, i) => `similar_projects_${i + 1}`),
     ...plan.comparisons.map((_, i) => `comparison_${i + 1}`)
   ]
 
   // Add originality screens if they exist in the plan
   if (plan.originalityProjects) {
     screenChecks.push(...plan.originalityProjects.map((_, i) => `originality_${i + 1}`))
+  }
+
+  // Defensive check: Add similar projects if they exist in old plans
+  if (plan.similarProjects) {
+    screenChecks.push(...plan.similarProjects.map((_, i) => `similar_projects_${i + 1}`))
   }
 
   // Migration: Add wasSkipped field to old completion records
@@ -291,10 +295,10 @@ function createNavigationFromPlan(plan, completedScreens, skippedScreens, inProg
       data: null
     },
     {
-      id: 'range_definition',
-      screenType: 'range_definition',
-      text: 'Range Definition',
-      status: getStatus('range_definition'),
+      id: 'top_projects',
+      screenType: 'top_projects',
+      text: 'Top Projects',
+      status: getStatus('top_projects'),
       data: null
     },
     {
@@ -306,17 +310,19 @@ function createNavigationFromPlan(plan, completedScreens, skippedScreens, inProg
     }
   ]
 
-  // Add similar projects with data
-  plan.similarProjects.forEach((project, index) => {
-    const id = `similar_projects_${index + 1}`
-    items.push({
-      id,
-      screenType: 'similar_projects',
-      text: `Similar: ${project.repo}`,
-      status: getStatus(id),
-      data: { targetProject: project }
+  // Defensive check: Add similar projects if they exist in old plans
+  if (plan.similarProjects) {
+    plan.similarProjects.forEach((project, index) => {
+      const id = `similar_projects_${index + 1}`
+      items.push({
+        id,
+        screenType: 'similar_projects',
+        text: `Similar: ${project.repo}`,
+        status: getStatus(id),
+        data: { targetProject: project }
+      })
     })
-  })
+  }
 
   // Add comparisons with data
   plan.comparisons.forEach((pair, index) => {
@@ -408,6 +414,7 @@ async function handleCompleteScreen(userAddress, screenId, data, kv) {
 
       const repoSelection = JSON.parse(repoSelectionData)
       const selectedRepoNames = repoSelection.data.finalSelectedRepos || []
+      const lockedRepos = repoSelection.data.lockedReposFromTopProjects || []
 
       if (selectedRepoNames.length < 10) {
         console.error('Not enough selected repos for plan generation:', selectedRepoNames.length)
@@ -418,32 +425,13 @@ async function handleCompleteScreen(userAddress, screenId, data, kv) {
       const { getProjectByRepo, getRandomPairFrom, getDiversePairFrom, getRandomProjectsForOriginalityFrom } = await import('@/lib/eloHelpers')
       const selectedRepos = selectedRepoNames.map(repo => getProjectByRepo(repo)).filter(p => p)
 
-      // Get the most/least valuable repos for exclusion
-      const mostValuable = repoSelection.data.mostValuableFromScale
-      const leastValuable = repoSelection.data.leastValuableFromScale
-
-      // Generate evaluation plan: 2 similar projects, 10 comparisons, 3 originality
+      // Generate evaluation plan: 10 comparisons, 3 originality (similar projects removed)
       // All selected from the user's chosen repos
-      const similarProjects = [
-        selectedRepos[Math.floor(Math.random() * selectedRepos.length)],
-        selectedRepos[Math.floor(Math.random() * selectedRepos.length)]
-      ]
 
-      // Generate comparisons, excluding most/least valuable being compared against each other
+      // Generate comparisons (no exclusion logic - treat all projects equally)
       const comparisons = []
       for (let i = 0; i < 10; i++) {
-        let pair
-        let attempts = 0
-        // Try to get a valid pair (not most vs least)
-        do {
-          pair = i % 2 === 0 ? getRandomPairFrom(selectedRepos) : getDiversePairFrom(selectedRepos)
-          attempts++
-        } while (
-          pair &&
-          ((pair[0].repo === mostValuable && pair[1].repo === leastValuable) ||
-           (pair[0].repo === leastValuable && pair[1].repo === mostValuable)) &&
-          attempts < 20 // Prevent infinite loop
-        )
+        const pair = i % 2 === 0 ? getRandomPairFrom(selectedRepos) : getDiversePairFrom(selectedRepos)
         if (pair) {
           comparisons.push(pair)
         }
@@ -452,9 +440,9 @@ async function handleCompleteScreen(userAddress, screenId, data, kv) {
       const originalityProjects = getRandomProjectsForOriginalityFrom(selectedRepos, 3)
 
       const plan = {
-        version: 2,  // Schema version (v2 includes selectedRepos)
+        version: 4,  // Schema version (v4: removed similar_projects screens)
         selectedRepos: selectedRepoNames,  // Store the repo names
-        similarProjects,
+        lockedRepos: lockedRepos,  // Store the 3 locked repos from Top Projects
         comparisons,
         originalityProjects,
         planGenerated: new Date().toISOString(),

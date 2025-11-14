@@ -3,7 +3,7 @@ export const runtime = 'nodejs'
 import { cookies, headers } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { getIronSession } from 'iron-session'
-import { sessionOptions } from '@/lib/session'
+import { sessionOptions, SESSION_VERSION } from '@/lib/session'
 import { SiweMessage } from 'siwe'
 import { submitSessionData } from '@/lib/googleSheets'
 import { getCloudflareContext } from "@opennextjs/cloudflare"
@@ -143,7 +143,8 @@ export async function POST(req) {
       return NextResponse.json({ error: 'Invite code required' }, { status: 401 })
     }
 
-    // Store user in session
+    // Store user in session with version
+    session.version = SESSION_VERSION
     session.user = {
       address: siwe.address.toLowerCase(),
       ensName: ensName,
