@@ -26,7 +26,7 @@ This architecture separates "working data" (KV) from "permanent records" (Sheets
 
 ### Deployment
 
-The application runs on Cloudflare Pages using Next.js 15 with the OpenNext adapter. Separate preview and production environments maintain isolated KV namespaces and Google Sheets for safe testing.
+The application runs on Cloudflare Workers using Next.js 15 with the OpenNext adapter. Separate preview and production environments maintain isolated KV namespaces and Google Sheets for safe testing.
 
 For detailed deployment procedures, see [docs/deployment.md](./docs/deployment.md).
 
@@ -78,12 +78,17 @@ ENABLE_INVITE_CODES=true
 
 ### Deployment
 
-Deploy to Cloudflare Pages with OpenNext:
+Deploy to Cloudflare Workers with OpenNext:
 
 ```bash
-npm run build    # OpenNext build
-npm run deploy   # Deploy to Cloudflare Pages
+# Deploy to cloud preview (testing)
+npm run deploy:preview    # → Preview Worker (separate environment)
+
+# Deploy to production
+npm run deploy            # → Production Worker
 ```
+
+The preview deployment creates a separate worker (`deepfunding-jury-scoring-preview`) with preview KV namespace and preview Google Sheet for safe testing. Production uses separate production KV and Google Sheet for real juror data.
 
 ## Project Structure
 

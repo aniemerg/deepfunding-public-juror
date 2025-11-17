@@ -12,6 +12,7 @@
 		"generate-datasets": "node scripts/generate-datasets.js",
 		"generate-elo": "node scripts/generate-datasets.js",
 		"deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+		"deploy:preview": "opennextjs-cloudflare build && opennextjs-cloudflare deploy --env preview",
 		"preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
 		"cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
 		"kv": "node scripts/kv-manager.js"

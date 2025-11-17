@@ -23,5 +23,17 @@
       "id": "d5dc344ae45b41b88f0f0ae11cefa8ba",
       "preview_id": "221e8a16f90a4ae8bf4025f471d4c31c"
     }
-  ]
+  ],
+
+  "env": {
+    "preview": {
+      "name": "deepfunding-jury-scoring-preview",
+      "kv_namespaces": [
+        {
+          "binding": "JURY_DATA",
+          "id": "221e8a16f90a4ae8bf4025f471d4c31c"
+        }
+      ]
+    }
+  }
 }
