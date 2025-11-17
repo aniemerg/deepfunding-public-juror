@@ -10,22 +10,26 @@ import { getCloudflareContext } from "@opennextjs/cloudflare"
 import { createPublicClient, http } from 'viem'
 import { mainnet, base } from 'viem/chains'
 
-// ENS Resolution function
+// ENS Resolution function - uses viem to query blockchain directly (no caching)
 async function resolveENSName(address) {
   try {
     console.log('Backend: Resolving ENS for address:', address);
-    
-    // Use the same API that works in frontend
-    const ensApiResponse = await fetch(`https://api.ensideas.com/ens/resolve/${address}`);
-    if (ensApiResponse.ok) {
-      const ensData = await ensApiResponse.json();
-      console.log('Backend: ENS API response:', ensData);
-      if (ensData.name && ensData.name.endsWith('.eth')) {
-        console.log('Backend: Found ENS via API:', ensData.name);
-        return ensData.name;
-      }
+
+    // Use viem to get ENS name directly from blockchain
+    const client = createPublicClient({
+      chain: mainnet,
+      transport: http()
+    })
+
+    const ensName = await client.getEnsName({
+      address: address
+    })
+
+    if (ensName && ensName.endsWith('.eth')) {
+      console.log('Backend: Found ENS via viem:', ensName);
+      return ensName;
     }
-    
+
     console.log('Backend: No ENS found for address:', address);
     return null;
   } catch (error) {
@@ -132,9 +136,11 @@ export async function POST(req) {
     // Resolve ENS name - REQUIRED for login
     const ensName = await resolveENSName(siwe.address);
     if (!ensName) {
-      return NextResponse.json({ 
-        error: 'ENS name required. This address must have an ENS name to participate.',
-        address: siwe.address 
+      return NextResponse.json({
+        error: 'Primary ENS Name Required',
+        message: 'To participate, you must own an ENS name ending in .eth and set it as your Primary ENS Name for this wallet address.',
+        helpUrl: 'https://support.ens.domains/en/articles/8684192-how-to-set-as-primary-name',
+        address: siwe.address
       }, { status: 403 })
     }
 

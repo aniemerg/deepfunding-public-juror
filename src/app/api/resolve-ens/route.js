@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
+import { createPublicClient, http } from 'viem'
+import { mainnet } from 'viem/chains'
 
-// Server-side ENS resolution proxy
+// Server-side ENS resolution using viem (direct blockchain queries, no caching)
 // This allows clients to resolve ENS names through our server,
 // bypassing CORS and mobile browser restrictions
 export async function GET(req) {
@@ -14,27 +16,24 @@ export async function GET(req) {
   }
 
   try {
-    // Call the ENS API from the server
-    const apiUrl = `https://api.ensideas.com/ens/resolve/${address}`
-    const response = await fetch(apiUrl)
+    // Use viem to get ENS name directly from blockchain
+    const client = createPublicClient({
+      chain: mainnet,
+      transport: http()
+    })
 
-    if (!response.ok) {
-      return NextResponse.json({
-        error: 'ENS resolution failed',
-        status: response.status
-      }, { status: response.status })
-    }
-
-    const data = await response.json()
+    const ensName = await client.getEnsName({
+      address: address
+    })
 
     // Validate the response
-    if (data.name && data.name.endsWith('.eth')) {
+    if (ensName && ensName.endsWith('.eth')) {
       return NextResponse.json({
         success: true,
-        name: data.name,
-        address: data.address,
-        displayName: data.displayName,
-        avatar: data.avatar
+        name: ensName,
+        address: address,
+        displayName: ensName,
+        avatar: null // Avatar resolution can be added later if needed
       })
     }
 

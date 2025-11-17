@@ -55,7 +55,11 @@ export default function LoginPage() {
       // No ENS found
       console.log('No ENS found for address:', walletAddress)
       setEnsName('');
-      setError(`This wallet address (${walletAddress}) does not have an ENS name. An ENS name ending in .eth is required to participate.`);
+      setError({
+        title: 'Primary ENS Name Required',
+        message: 'To participate, you must own an ENS name ending in .eth and set it as your Primary ENS Name for this wallet address.',
+        helpUrl: 'https://support.ens.domains/en/articles/8684192-how-to-set-as-primary-name'
+      });
 
     } catch (err) {
       console.error('ENS check failed:', err);
@@ -72,7 +76,14 @@ export default function LoginPage() {
       await login(inviteCode || undefined)
       router.push('/evaluation')
     } catch (err) {
-      setError(err.message)
+      // Handle structured error responses
+      if (err.response) {
+        setError(err.response)
+      } else if (err.message) {
+        setError(err.message)
+      } else {
+        setError('Authentication failed. Please try again.')
+      }
     } finally {
       setIsLogging(false)
     }
@@ -143,7 +154,25 @@ export default function LoginPage() {
 
             {error && (
               <div style={styles.error}>
-                {error}
+                {typeof error === 'string' ? (
+                  error
+                ) : (
+                  <>
+                    {error.title && <div style={styles.errorTitle}>{error.title}</div>}
+                    {error.message && <div style={styles.errorMessage}>{error.message}</div>}
+                    {error.error && !error.message && <div style={styles.errorMessage}>{error.error}</div>}
+                    {error.helpUrl && (
+                      <a
+                        href={error.helpUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={styles.helpLink}
+                      >
+                        📖 Learn how to set your Primary ENS Name →
+                      </a>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -235,6 +264,24 @@ const styles = {
     borderRadius: '4px',
     color: '#c33',
     fontSize: '14px',
+  },
+  errorTitle: {
+    fontWeight: 'bold',
+    marginBottom: '8px',
+    fontSize: '15px',
+  },
+  errorMessage: {
+    marginBottom: '8px',
+    lineHeight: '1.5',
+  },
+  helpLink: {
+    display: 'inline-block',
+    marginTop: '8px',
+    color: '#0070f3',
+    textDecoration: 'none',
+    fontWeight: '500',
+    fontSize: '14px',
+    transition: 'color 0.2s',
   },
   checking: {
     padding: '12px',

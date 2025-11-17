@@ -82,7 +82,14 @@ export function useAuth() {
       const data = await response.json()
 
       if (!response.ok) {
-        // Include detailed error information if available
+        // If we have a structured error response (e.g., ENS error with helpUrl), pass it through
+        if (data.message || data.helpUrl) {
+          const error = new Error(data.error || data.message || 'Authentication failed')
+          error.response = data // Attach full response for structured error handling
+          throw error
+        }
+
+        // Otherwise, construct error message from details
         let errorMessage = data.error || 'Authentication failed'
         if (data.details) {
           if (typeof data.details === 'string') {
