@@ -25,6 +25,17 @@
     }
   ],
 
+  // D1 Database binding for AI comparison analysis
+  // Run: node scripts/setup-ai-comparisons-db.js to create the database and get IDs
+  "d1_databases": [
+    {
+      "binding": "AI_COMPARISONS",
+      "database_name": "ai-comparisons",
+      "database_id": "REPLACE_WITH_PRODUCTION_DB_ID",
+      "preview_id": "REPLACE_WITH_PREVIEW_DB_ID"
+    }
+  ],
+
   "env": {
     "preview": {
       "name": "deepfunding-jury-scoring-preview",
@@ -32,6 +43,13 @@
         {
           "binding": "JURY_DATA",
           "id": "221e8a16f90a4ae8bf4025f471d4c31c"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "AI_COMPARISONS",
+          "database_name": "ai-comparisons-preview",
+          "database_id": "REPLACE_WITH_PREVIEW_DB_ID"
         }
       ]
     }
