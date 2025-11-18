@@ -103,7 +103,9 @@ Your data file should be in this format:
 ]
 ```
 
-Place this file in the `design/` folder, e.g., `design/ai-comparisons-nalla-1.json`
+**Location:** Place data files in `data/ai-comparisons/` directory (tracked with Git LFS)
+
+**Naming:** Use model name as filename, e.g., `data/ai-comparisons/Nalla-1.json`
 
 ### 3. Populate the Database
 
@@ -111,10 +113,10 @@ Run the population script to load data into D1:
 
 ```bash
 # For preview environment (local development)
-npm run populate-ai-comparisons design/ai-comparisons-nalla-1.json --model=Nalla-1 --env=preview
+npm run populate-ai-comparisons data/ai-comparisons/Nalla-1.json --model=Nalla-1 --env=preview
 
 # For production environment
-npm run populate-ai-comparisons design/ai-comparisons-nalla-1.json --model=Nalla-1 --env=production
+npm run populate-ai-comparisons data/ai-comparisons/Nalla-1.json --model=Nalla-1 --env=production
 ```
 
 **Options:**
@@ -212,11 +214,14 @@ The `AIComparisonPanel` component:
 To add a new AI model:
 
 1. Generate comparison data in the same JSON format
-2. Run population script with new model name:
+2. Place file in `data/ai-comparisons/NewModel.json`
+3. Run population script with new model name:
    ```bash
-   npm run populate-ai-comparisons design/ai-comparisons-new-model.json --model=NewModel-1
+   npm run populate-ai-comparisons data/ai-comparisons/NewModel.json --model=NewModel-1 --env=preview
    ```
-3. The UI automatically displays all models
+4. The UI automatically displays all models
+
+**Note:** Files in `data/ai-comparisons/` are tracked with Git LFS automatically.
 
 ## Data Normalization
 
@@ -315,12 +320,17 @@ When deploying to production:
 
 2. Update `wrangler.jsonc` with production database ID
 
-3. Populate production database:
+3. Ensure data files are pulled from Git LFS:
    ```bash
-   npm run populate-ai-comparisons design/ai-comparisons-nalla-1.json --model=Nalla-1 --env=production
+   git lfs pull
    ```
 
-4. Deploy application:
+4. Populate production database:
+   ```bash
+   npm run populate-ai-comparisons data/ai-comparisons/Nalla-1.json --model=Nalla-1 --env=production
+   ```
+
+5. Deploy application:
    ```bash
    npm run deploy
    ```
