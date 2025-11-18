@@ -26,13 +26,13 @@
   ],
 
   // D1 Database binding for AI comparison analysis
-  // Run: node scripts/setup-ai-comparisons-db.js to create the database and get IDs
+  // For local development, wrangler uses database_name from env.preview
+  // For production, it uses the database_id from this main section
   "d1_databases": [
     {
       "binding": "AI_COMPARISONS",
       "database_name": "ai-comparisons",
-      "database_id": "REPLACE_WITH_PRODUCTION_DB_ID",
-      "preview_id": "REPLACE_WITH_PREVIEW_DB_ID"
+      "database_id": "REPLACE_WITH_PRODUCTION_DB_ID"
     }
   ],
 
@@ -49,7 +49,7 @@
         {
           "binding": "AI_COMPARISONS",
           "database_name": "ai-comparisons-preview",
-          "database_id": "REPLACE_WITH_PREVIEW_DB_ID"
+          "database_id": "fdf82c63-a22e-47f8-bd00-da9dc32c8b1c"
         }
       ]
     }

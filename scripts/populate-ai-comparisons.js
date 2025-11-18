@@ -55,8 +55,33 @@ console.log(`   Environment: ${environment}`);
 console.log(`   Data file: ${dataFile}`);
 console.log(`   Force: ${forceFlag ? 'Yes' : 'No'}\n`);
 
-// Import normalization helper
-const { normalizeComparison } = require('../src/lib/aiComparisonHelpers.js');
+// Normalization helper (duplicated here to avoid ES module import issues)
+function normalizeComparison(raw) {
+  const repoA = raw.repo_a;
+  const repoB = raw.repo_b;
+  const choice = raw.prediction.choice;
+
+  // Normalize: alphabetically sort repos
+  if (repoA < repoB) {
+    // Already in correct order
+    return {
+      repo_a: repoA,
+      repo_b: repoB,
+      choice: choice,
+      multiplier: raw.prediction.multiplier,
+      final_reasoning: raw.prediction.final_reasoning
+    };
+  } else {
+    // Swap repos and flip choice
+    return {
+      repo_a: repoB,  // Now alphabetically first
+      repo_b: repoA,  // Now alphabetically second
+      choice: choice === 1 ? 2 : 1,  // Flip choice
+      multiplier: raw.prediction.multiplier,
+      final_reasoning: raw.prediction.final_reasoning
+    };
+  }
+}
 
 // Read and parse data file
 console.log('📖 Reading data file...');
@@ -64,7 +89,8 @@ const rawData = JSON.parse(fs.readFileSync(dataFilePath, 'utf-8'));
 console.log(`   Found ${rawData.length} comparisons\n`);
 
 // Check if model is already populated
-const envArg = environment === 'production' ? '--remote' : '--local';
+// Use --remote for cloud D1 databases (both preview and production)
+const envArg = '--remote';
 const dbName = environment === 'production' ? 'ai-comparisons' : 'ai-comparisons-preview';
 
 if (!forceFlag) {
@@ -105,7 +131,8 @@ const normalized = rawData.map(raw => {
 console.log(`   ✓ Normalized ${normalized.length} comparisons\n`);
 
 // Insert data in batches
-const BATCH_SIZE = 100;
+// Note: Small batch size due to large final_reasoning text fields
+const BATCH_SIZE = 5;
 const batches = [];
 for (let i = 0; i < normalized.length; i += BATCH_SIZE) {
   batches.push(normalized.slice(i, i + BATCH_SIZE));
