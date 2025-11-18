@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useAutosave, useDataSubmission } from '@/hooks/useAutoSave'
-import { 
+import {
   getRandomPair,
   getDiversePair,
   getFundingPercentage,
   formatRepoName
 } from '@/lib/eloHelpers'
+import { getProjectWithSummary } from '@/lib/projectSummaries'
+import { ProjectSummaryPanel } from '@/components/ProjectSummaryPanel'
 
 export function ComparisonScreen({ screenId: passedScreenId, projectPair: plannedProjectPair, onNext, onBack, onForward, isCompleted, onProjectChange }) {
   const { user } = useAuth()
@@ -274,6 +276,15 @@ export function ComparisonScreen({ screenId: passedScreenId, projectPair: planne
               </div>
             </button>
           </div>
+
+          <ProjectSummaryPanel
+            projects={[
+              projectA ? getProjectWithSummary(projectA.repo) : null,
+              projectB ? getProjectWithSummary(projectB.repo) : null
+            ].filter(Boolean)}
+            layout="dual"
+            defaultExpanded={false}
+          />
 
           <div className="multiplier-section">
             <label htmlFor="multiplier">

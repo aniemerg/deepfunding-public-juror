@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { useAutosave, useDataSubmission } from '@/hooks/useAutoSave'
+import { getProjectWithSummary } from '@/lib/projectSummaries'
+import { ProjectSummaryPanel } from '@/components/ProjectSummaryPanel'
 
 export function OriginalityScreen({ screenId: passedScreenId, targetProject, onNext, onBack, onForward, isCompleted }) {
   const { user } = useAuth()
@@ -188,6 +190,12 @@ export function OriginalityScreen({ screenId: passedScreenId, targetProject, onN
               {targetProject.repo}
             </a>
           </div>
+
+          <ProjectSummaryPanel
+            projects={[targetProject ? getProjectWithSummary(targetProject.repo) : null].filter(Boolean)}
+            layout="single"
+            defaultExpanded={false}
+          />
 
           <div className="task-description">
             <p>
