@@ -25,6 +25,18 @@
     }
   ],
 
+  // D1 Database binding for AI comparison analysis
+  // Always uses remote database (read-only reference data)
+  // Set remote: true to bypass local development database
+  "d1_databases": [
+    {
+      "binding": "AI_COMPARISONS",
+      "database_name": "ai-comparisons-preview",
+      "database_id": "fdf82c63-a22e-47f8-bd00-da9dc32c8b1c",
+      "remote": true
+    }
+  ],
+
   "env": {
     "preview": {
       "name": "deepfunding-jury-scoring-preview",
@@ -32,6 +44,13 @@
         {
           "binding": "JURY_DATA",
           "id": "221e8a16f90a4ae8bf4025f471d4c31c"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "AI_COMPARISONS",
+          "database_name": "ai-comparisons-preview",
+          "database_id": "fdf82c63-a22e-47f8-bd00-da9dc32c8b1c"
         }
       ]
     }

@@ -11,6 +11,7 @@ import {
 } from '@/lib/eloHelpers'
 import { getProjectWithSummary } from '@/lib/projectSummaries'
 import { ProjectSummaryPanel } from '@/components/ProjectSummaryPanel'
+import { AIComparisonPanel } from '@/components/AIComparisonPanel'
 
 export function ComparisonScreen({ screenId: passedScreenId, projectPair: plannedProjectPair, onNext, onBack, onForward, isCompleted, onProjectChange }) {
   const { user } = useAuth()
@@ -284,6 +285,11 @@ export function ComparisonScreen({ screenId: passedScreenId, projectPair: planne
             ].filter(Boolean)}
             layout="dual"
             defaultExpanded={false}
+          />
+
+          <AIComparisonPanel
+            repoA={projectA?.repo}
+            repoB={projectB?.repo}
           />
 
           <div className="multiplier-section">
