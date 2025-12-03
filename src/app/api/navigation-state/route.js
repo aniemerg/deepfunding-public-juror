@@ -422,20 +422,14 @@ async function handleCompleteScreen(userAddress, screenId, data, kv) {
       }
 
       // Convert repo names to project objects
-      const { getProjectByRepo, getRandomPairFrom, getDiversePairFrom, getRandomProjectsForOriginalityFrom } = await import('@/lib/eloHelpers')
+      const { getProjectByRepo, generateUniquePairs, getRandomProjectsForOriginalityFrom } = await import('@/lib/eloHelpers')
       const selectedRepos = selectedRepoNames.map(repo => getProjectByRepo(repo)).filter(p => p)
 
       // Generate evaluation plan: 10 comparisons, 3 originality (similar projects removed)
       // All selected from the user's chosen repos
 
-      // Generate comparisons (no exclusion logic - treat all projects equally)
-      const comparisons = []
-      for (let i = 0; i < 10; i++) {
-        const pair = i % 2 === 0 ? getRandomPairFrom(selectedRepos) : getDiversePairFrom(selectedRepos)
-        if (pair) {
-          comparisons.push(pair)
-        }
-      }
+      // Generate 10 unique comparison pairs (no duplicate pairs)
+      const comparisons = generateUniquePairs(selectedRepos, 10)
 
       const originalityProjects = getRandomProjectsForOriginalityFrom(selectedRepos, 3)
 

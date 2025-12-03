@@ -194,6 +194,51 @@ export function getDiversePairFrom(selectedRepos) {
   return [project1, project2];
 }
 
+// Generate N unique comparison pairs from selected repos (no duplicates)
+export function generateUniquePairs(selectedRepos, count) {
+  if (!selectedRepos || selectedRepos.length < 2) {
+    console.error('Need at least 2 repos for pair generation');
+    return [];
+  }
+
+  // Convert to project objects if needed
+  const projects = selectedRepos[0]?.repo
+    ? selectedRepos
+    : selectedRepos.map(repo => getProjectByRepo(repo)).filter(p => p);
+
+  if (projects.length < 2) {
+    console.error('Not enough valid projects for pairs');
+    return [];
+  }
+
+  const pairs = [];
+  const usedPairKeys = new Set();  // Track "repoA|repoB" (sorted alphabetically)
+  const maxAttempts = count * 10;  // Prevent infinite loops
+  let attempts = 0;
+
+  while (pairs.length < count && attempts < maxAttempts) {
+    attempts++;
+
+    // Shuffle and pick two random projects
+    const shuffled = [...projects].sort(() => Math.random() - 0.5);
+    const pair = [shuffled[0], shuffled[1]];
+
+    // Create canonical key (sorted to treat A-B same as B-A)
+    const pairKey = [pair[0].repo, pair[1].repo].sort().join('|');
+
+    if (!usedPairKeys.has(pairKey)) {
+      usedPairKeys.add(pairKey);
+      pairs.push(pair);
+    }
+  }
+
+  if (pairs.length < count) {
+    console.warn(`Could only generate ${pairs.length} unique pairs out of ${count} requested`);
+  }
+
+  return pairs;
+}
+
 // Get random projects for originality from selected repos
 export function getRandomProjectsForOriginalityFrom(selectedRepos, count = 3) {
   if (!selectedRepos || selectedRepos.length < count) {
