@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createPublicClient, http } from 'viem'
+import { createPublicClient, http, normalize } from 'viem'
 import { mainnet } from 'viem/chains'
 
 // Server-side ENS resolution using viem (direct blockchain queries, no caching)
@@ -28,12 +28,23 @@ export async function GET(req) {
 
     // Validate the response
     if (ensName && ensName.endsWith('.eth')) {
+      // Try to get the avatar
+      let avatar = null
+      try {
+        const avatarUrl = await client.getEnsAvatar({
+          name: normalize(ensName)
+        })
+        avatar = avatarUrl
+      } catch (avatarError) {
+        console.log('Avatar resolution failed (optional):', avatarError.message)
+      }
+
       return NextResponse.json({
         success: true,
         name: ensName,
         address: address,
         displayName: ensName,
-        avatar: null // Avatar resolution can be added later if needed
+        avatar: avatar
       })
     }
 
