@@ -38,7 +38,8 @@ export async function POST(req) {
         if (!isSkipped) {
           await submitBackgroundData(env, {
             ensName,
-            backgroundText: payload.backgroundText
+            backgroundText: payload.backgroundText,
+            contactInfo: payload.contactInfo
           });
         }
         break;

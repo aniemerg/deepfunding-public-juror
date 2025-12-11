@@ -17,7 +17,6 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const readline = require('readline');
 
 // KV namespace IDs from wrangler.jsonc
 const KV_NAMESPACES = {
@@ -182,21 +181,6 @@ function deleteKey(key, env = 'preview', useLocal = false) {
     error(`Failed to delete key ${key}: ${err.message}`);
     return false;
   }
-}
-
-// Ask for confirmation
-function askConfirmation(question) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-
-  return new Promise((resolve) => {
-    rl.question(question + ' (yes/no): ', (answer) => {
-      rl.close();
-      resolve(answer.toLowerCase() === 'yes');
-    });
-  });
 }
 
 // Extract user addresses from keys
@@ -368,16 +352,12 @@ function cmdExport(user, filename, env, useLocal = false) {
 }
 
 // Command: clear - Delete all user data
-async function cmdClear(user, env, useLocal = false, force = false) {
+async function cmdClear(user, env, useLocal = false) {
   const storageType = useLocal ? 'local' : 'remote';
-  warning(`\nAbout to delete ALL data for ${user}`);
-  log(`Storage: ${storageType}`);
-  log(`Environment: ${env}\n`);
 
   // Resolve ENS to address (from KV or assume it's an address)
   const address = resolveENS(user, env, useLocal);
   const ensName = getENSFromKV(address, env, useLocal);
-  log(`User: ${ensName || address}\n`);
 
   // Get all keys for this user
   const allKeys = getAllKeys(env, useLocal);
@@ -388,55 +368,28 @@ async function cmdClear(user, env, useLocal = false, force = false) {
     return;
   }
 
-  log(`Keys to delete: ${userKeys.length}\n`, colors.red);
-  userKeys.forEach(key => log(`  ${key}`, colors.red));
-  log('');
-
-  // Skip confirmations if --force flag is set
-  if (!force) {
-    // Extra confirmation for production
-    if (env === 'production' && !useLocal) {
-      error('WARNING: You are about to delete PRODUCTION data!');
-      const confirm1 = await askConfirmation('Type "yes" to confirm production delete');
-      if (!confirm1) {
-        log('Cancelled.');
-        return;
-      }
-    }
-
-    const confirmed = await askConfirmation('Are you sure?');
-    if (!confirmed) {
-      log('Cancelled.');
-      return;
-    }
+  // Show what we're doing
+  if (env === 'production' && !useLocal) {
+    error(`Deleting ${userKeys.length} keys for ${ensName || address} from PRODUCTION`);
   } else {
-    warning('--force flag detected, skipping confirmations');
+    info(`Deleting ${userKeys.length} keys for ${ensName || address} from ${storageType} KV (${env})`);
   }
 
   // Delete all keys
   let deleted = 0;
   const total = userKeys.length;
-  info(`\nDeleting ${total} keys...`);
 
   for (const key of userKeys) {
     if (deleteKey(key, env, useLocal)) {
       deleted++;
-      // Log progress every 10 keys
-      if (deleted % 10 === 0 || deleted === total) {
-        process.stdout.write(`\r  Progress: ${deleted}/${total} keys deleted`);
-      }
     }
   }
 
-  console.log(''); // New line after progress
   success(`Deleted ${deleted} keys`);
 }
 
 // Command: clear-pattern - Delete keys matching pattern
 async function cmdClearPattern(pattern, env) {
-  warning(`\nAbout to delete keys matching pattern: ${pattern}`);
-  log(`Environment: ${env}\n`);
-
   // Get all keys and filter by pattern
   const allKeys = getAllKeys(env);
   const regex = new RegExp(pattern.replace(/\*/g, '.*'));
@@ -447,45 +400,20 @@ async function cmdClearPattern(pattern, env) {
     return;
   }
 
-  log(`Keys to delete: ${matchingKeys.length}\n`, colors.red);
-  matchingKeys.slice(0, 20).forEach(key => log(`  ${key}`, colors.red));
-  if (matchingKeys.length > 20) {
-    log(`  ... and ${matchingKeys.length - 20} more`, colors.red);
-  }
-  log('');
-
-  // Extra confirmation for production
   if (env === 'production') {
-    error('WARNING: You are about to delete PRODUCTION data!');
-    const confirm1 = await askConfirmation('Type "yes" to confirm production delete');
-    if (!confirm1) {
-      log('Cancelled.');
-      return;
-    }
-  }
-
-  const confirmed = await askConfirmation('Are you sure?');
-  if (!confirmed) {
-    log('Cancelled.');
-    return;
+    error(`Deleting ${matchingKeys.length} keys matching "${pattern}" from PRODUCTION`);
+  } else {
+    info(`Deleting ${matchingKeys.length} keys matching "${pattern}" from ${env}`);
   }
 
   // Delete all matching keys
   let deleted = 0;
-  const total = matchingKeys.length;
-  info(`\nDeleting ${total} keys...`);
-
   for (const key of matchingKeys) {
     if (deleteKey(key, env)) {
       deleted++;
-      // Log progress every 10 keys
-      if (deleted % 10 === 0 || deleted === total) {
-        process.stdout.write(`\r  Progress: ${deleted}/${total} keys deleted`);
-      }
     }
   }
 
-  console.log(''); // New line after progress
   success(`Deleted ${deleted} keys`);
 }
 
@@ -493,40 +421,14 @@ async function cmdClearPattern(pattern, env) {
 async function cmdClearLocal() {
   const localStoragePath = path.join(process.cwd(), '.wrangler', 'state');
 
-  warning('\nAbout to delete LOCAL development storage');
-  log('This will clear data stored by "npm run preview"');
-  log(`Path: ${localStoragePath}\n`);
-
   if (!fs.existsSync(localStoragePath)) {
     warning('Local storage directory does not exist. Nothing to clear.');
     return;
   }
 
-  // Check if there's data
-  try {
-    const files = fs.readdirSync(localStoragePath, { recursive: true });
-    const kvFiles = files.filter(f => f.includes('kv'));
-    if (kvFiles.length === 0) {
-      warning('No KV storage files found. Nothing to clear.');
-      return;
-    }
-    log(`Found ${kvFiles.length} KV storage file(s)\n`, colors.yellow);
-  } catch (err) {
-    error(`Error reading storage directory: ${err.message}`);
-    return;
-  }
-
-  const confirmed = await askConfirmation('Delete local development storage?');
-  if (!confirmed) {
-    log('Cancelled.');
-    return;
-  }
-
   try {
     fs.rmSync(localStoragePath, { recursive: true, force: true });
-    success('Local development storage cleared!');
-    info('Note: Remote KV (preview/production) is not affected.');
-    info('Run "npm run preview" to start fresh.');
+    success('Local development storage cleared');
   } catch (err) {
     error(`Failed to clear local storage: ${err.message}`);
     throw err;
@@ -540,7 +442,7 @@ function showHelp() {
   log('  kv-manager list [--local] [--env=preview|production]');
   log('  kv-manager inspect <user> [--verbose] [--local] [--env=preview|production]');
   log('  kv-manager export <user> <file> [--local] [--env=preview|production]');
-  log('  kv-manager clear <user> [--local] [--force] [--env=preview|production]');
+  log('  kv-manager clear <user> [--local] [--env=preview|production]');
   log('  kv-manager clear-pattern <pattern> [--env=preview|production]');
   log('  kv-manager clear-local');
   log('\nCommands:', colors.cyan);
@@ -553,16 +455,15 @@ function showHelp() {
   log('\nFlags:', colors.cyan);
   log('  --local           Use local KV storage (for "npm run preview")');
   log('  --env=preview     Use preview KV namespace (default)');
-  log('  --env=production  Use production KV namespace (requires extra confirmation)');
-  log('  --force           Skip confirmation prompts (use with caution!)');
+  log('  --env=production  Use production KV namespace');
   log('  --verbose         Show full data in inspect command');
   log('\nExamples:', colors.cyan);
   log('  kv-manager list --local                    # List users in local dev storage');
   log('  kv-manager clear allanniemerg.eth --local  # Clear local dev data');
   log('  kv-manager inspect vitalik.eth --verbose   # Inspect remote KV');
   log('  kv-manager export alice.eth backup.json --local');
-  log('  kv-manager clear vitalik.eth --env=production --force   # Force clear production');
-  log('  kv-manager clear-local                     # Alternative to clear all local data');
+  log('  kv-manager clear vitalik.eth --env=production');
+  log('  kv-manager clear-local                     # Clear all local data');
   log('');
 }
 
@@ -607,10 +508,10 @@ async function main() {
 
       case 'clear':
         if (params.length < 1) {
-          error('Usage: kv-manager clear <user> [--local] [--force]');
+          error('Usage: kv-manager clear <user> [--local]');
           process.exit(1);
         }
-        await cmdClear(params[0], env, useLocal, flags.force);
+        await cmdClear(params[0], env, useLocal);
         break;
 
       case 'clear-pattern':

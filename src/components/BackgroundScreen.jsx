@@ -7,6 +7,7 @@ import { useAutosave, useDataSubmission } from '@/hooks/useAutoSave'
 export function BackgroundScreen({ onNext, onBack, onForward, isCompleted }) {
   const { user } = useAuth()
   const [backgroundText, setBackgroundText] = useState('')
+  const [contactInfo, setContactInfo] = useState('')
   const [wasSkipped, setWasSkipped] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastSubmittedAt, setLastSubmittedAt] = useState(null)
@@ -16,6 +17,7 @@ export function BackgroundScreen({ onNext, onBack, onForward, isCompleted }) {
   const screenId = 'background-info'
   const data = {
     backgroundText: backgroundText.trim() || null,
+    contactInfo: contactInfo.trim() || null,
     backgroundTimestamp: new Date().toISOString(),
     wasSkipped
   }
@@ -34,6 +36,7 @@ export function BackgroundScreen({ onNext, onBack, onForward, isCompleted }) {
       const submission = await getSubmissionStatus(user.address, screenType, screenId)
       if (submission.exists && submission.data) {
         setBackgroundText(submission.data.backgroundText || '')
+        setContactInfo(submission.data.contactInfo || '')
         setWasSkipped(submission.data.wasSkipped || false)
         setLastSubmittedAt(submission.data.backgroundTimestamp)
       }
@@ -132,6 +135,26 @@ export function BackgroundScreen({ onNext, onBack, onForward, isCompleted }) {
             <div className="char-counter">
               {charCount}/{maxChars} characters
             </div>
+          </div>
+
+          <div className="contact-field">
+            <label htmlFor="contactInfo" className="contact-label">
+              Contact Information <span className="optional-tag">(optional)</span>
+            </label>
+            <input
+              id="contactInfo"
+              type="text"
+              value={contactInfo}
+              onChange={(e) => setContactInfo(e.target.value)}
+              placeholder="Email or Telegram handle"
+              className="contact-input"
+              disabled={isSubmitting}
+            />
+            <p className="contact-helper">
+              We won't share your contact information with third parties. It may be used to
+              provide updates about Deep Funding, gather feedback to improve the evaluation
+              process, and notify you about future data collection rounds.
+            </p>
           </div>
 
           {error && (
@@ -273,6 +296,51 @@ export function BackgroundScreen({ onNext, onBack, onForward, isCompleted }) {
           margin-top: 0.5rem;
           font-size: 0.9rem;
           color: ${charCount > maxChars * 0.9 ? '#e53e3e' : '#718096'};
+        }
+
+        .contact-field {
+          margin-top: 1.5rem;
+        }
+
+        .contact-label {
+          display: block;
+          font-size: 0.95rem;
+          font-weight: 500;
+          color: #2d3748;
+          margin-bottom: 0.5rem;
+        }
+
+        .optional-tag {
+          font-weight: 400;
+          color: #718096;
+        }
+
+        .contact-input {
+          width: 100%;
+          padding: 0.75rem 1rem;
+          border: 2px solid #e2e8f0;
+          border-radius: 8px;
+          font-size: 1rem;
+          font-family: inherit;
+          transition: border-color 0.2s;
+        }
+
+        .contact-input:focus {
+          outline: none;
+          border-color: #3182ce;
+          box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+        }
+
+        .contact-input:disabled {
+          background-color: #f7fafc;
+          cursor: not-allowed;
+        }
+
+        .contact-helper {
+          margin-top: 0.5rem;
+          font-size: 0.85rem;
+          color: #718096;
+          line-height: 1.5;
         }
 
         .error-message {

@@ -139,7 +139,7 @@ async function markPreviousSubmissionsOld(env, accessToken, sheetName, walletAdd
 }
 
 // Submit background screen data
-export async function submitBackgroundData(env, { ensName, backgroundText }) {
+export async function submitBackgroundData(env, { ensName, backgroundText, contactInfo }) {
   const accessToken = await getAccessToken(env);
   const submissionId = generateSubmissionId();
   const sheetName = "Background";
@@ -149,7 +149,8 @@ export async function submitBackgroundData(env, { ensName, backgroundText }) {
     1, // version
     ensName,
     new Date().toISOString(),
-    backgroundText || ''
+    backgroundText || '',
+    contactInfo || ''
   ];
 
   return await appendToSheet(env, accessToken, sheetName, values);

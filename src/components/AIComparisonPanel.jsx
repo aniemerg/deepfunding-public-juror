@@ -86,7 +86,7 @@ export function AIComparisonPanel({ repoA, repoB }) {
             <div key={comparison.model} className="model-row">
               <div className="row-summary">
                 <div className="model-info">
-                  <span className="model-name">{comparison.model}</span>
+                  <span className="model-name">Model: {comparison.model}</span>
                   <span className="model-choice">
                     suggests:{' '}
                     <strong className="winner-name">
