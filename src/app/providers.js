@@ -5,9 +5,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit'
 import '@rainbow-me/rainbowkit/styles.css'
 
+const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'fallback-id'
+console.log('WalletConnect projectId:', projectId)
+
 const config = getDefaultConfig({
-  appName: 'Deep Funding Public Juror',
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'fallback-id',
+  appName: 'Verdict',
+  projectId,
   chains: [mainnet, sepolia],
   transports: {
     [mainnet.id]: http(),

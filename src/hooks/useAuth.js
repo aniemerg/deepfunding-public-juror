@@ -64,7 +64,7 @@ export function useAuth() {
         domain: window.location.host,
         uri: window.location.origin,
         version: '1',
-        statement: 'Sign in to Deep Funding Public Juror',
+        statement: 'Sign in to Verdict',
         nonce,
       })
 

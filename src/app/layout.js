@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata = {
-  title: "Deep Funding Public Jury",
-  description: "An evaluation system for Ethereum ecosystem projects",
+  title: "Verdict",
+  description: "Human judgment for open source funding",
 };
 
 export default function RootLayout({ children }) {

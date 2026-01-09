@@ -92,9 +92,9 @@ export default function LoginPage() {
     <div style={styles.container}>
       <div style={styles.card}>
         <div style={styles.header}>
-          <h1 style={styles.title}>Deep Funding Public Jury</h1>
+          <h1 style={styles.title}>Verdict</h1>
           <p style={styles.subtitle}>
-            An evaluation system for Ethereum ecosystem projects
+            Human judgment for open source funding
           </p>
         </div>
 

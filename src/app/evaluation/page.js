@@ -262,7 +262,7 @@ export default function EvaluationPage() {
         >
           ☰
         </button>
-        <h1 style={styles.title}>Deep Funding Public Juror</h1>
+        <h1 style={styles.title}>Verdict</h1>
         <div style={styles.userInfo}>
           <span style={styles.address}>
             {user.ensName}
