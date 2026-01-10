@@ -1,16 +1,19 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 
 export function NavigationSidebar({
   navigationItems,
   currentScreen,
   onNavigate,
   isMobileMenuOpen = false,
-  onCloseMobileMenu = () => {}
+  onCloseMobileMenu = () => {},
+  showLevel3Link = false
 }) {
   const [itemWidths, setItemWidths] = useState({})
   const sidebarRef = useRef()
+  const router = useRouter()
 
   // Measure available width for each navigation item
   useEffect(() => {
@@ -177,6 +180,17 @@ export function NavigationSidebar({
           })}
         </div>
 
+        {showLevel3Link && (
+          <div className="level3-section">
+            <button
+              className="level3-link"
+              onClick={() => router.push('/level3')}
+            >
+              Level 3: Dependencies →
+            </button>
+          </div>
+        )}
+
       <style jsx>{`
         /* Mobile backdrop - hidden on desktop */
         .mobile-backdrop {
@@ -284,6 +298,31 @@ export function NavigationSidebar({
           flex: 1;
           overflow: hidden;
           white-space: nowrap;
+        }
+
+        .level3-section {
+          margin-top: auto;
+          padding-top: 1rem;
+          border-top: 1px solid #e2e8f0;
+        }
+
+        .level3-link {
+          width: 100%;
+          padding: 0.75rem;
+          background-color: #ebf8ff;
+          border: 1px solid #bfdbfe;
+          border-radius: 6px;
+          color: #1e40af;
+          font-size: 0.9rem;
+          font-weight: 500;
+          cursor: pointer;
+          text-align: left;
+          transition: all 0.2s;
+        }
+
+        .level3-link:hover {
+          background-color: #dbeafe;
+          border-color: #93c5fd;
         }
 
         /* Mobile responsiveness */
