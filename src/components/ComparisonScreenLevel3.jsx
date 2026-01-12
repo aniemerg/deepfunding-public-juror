@@ -128,25 +128,92 @@ export default function ComparisonScreenLevel3({
 }
 
 function DepDetails({ usageSummary }) {
-  const details = getDependencyDetails(usageSummary)
-  if (!details) return null
+  if (!usageSummary) return null
+
+  const contexts = []
+  if (usageSummary.appears_in_runtime_code) contexts.push('Runtime code')
+  if (usageSummary.appears_in_test_code) contexts.push('Test code')
+  if (usageSummary.appears_in_build_or_docs) contexts.push('Build/Docs')
 
   return (
     <div style={styles.detailsSection}>
-      <div style={styles.detailRow}>
-        <strong>Usage Type:</strong> {details.usageClass}
-      </div>
-      {details.contexts.length > 0 && (
-        <div style={styles.detailRow}>
-          <strong>Used in:</strong> {details.contexts.join(', ')}
+      {/* Usage Class */}
+      {usageSummary.usage_class && (
+        <div style={styles.detailBlock}>
+          <div style={styles.detailLabel}>Usage Classification:</div>
+          <div style={styles.detailValue}>{usageSummary.usage_class}</div>
         </div>
       )}
-      {details.roles.length > 0 && (
-        <div style={styles.detailRow}>
-          <strong>Roles:</strong>
-          <ul style={styles.rolesList}>
-            {details.roles.map((role, i) => (
-              <li key={i}>{role}</li>
+
+      {/* Inclusion Type */}
+      {usageSummary.inclusion_type && (
+        <div style={styles.detailBlock}>
+          <div style={styles.detailLabel}>Inclusion:</div>
+          <div style={styles.detailValue}>
+            {usageSummary.inclusion_type === 'direct' ? 'Direct dependency' : 'Transitive dependency'}
+          </div>
+        </div>
+      )}
+
+      {/* Contexts */}
+      {contexts.length > 0 && (
+        <div style={styles.detailBlock}>
+          <div style={styles.detailLabel}>Used in:</div>
+          <div style={styles.detailValue}>{contexts.join(', ')}</div>
+        </div>
+      )}
+
+      {/* Usage Roles */}
+      {usageSummary.usage_roles && usageSummary.usage_roles.length > 0 && (
+        <div style={styles.detailBlock}>
+          <div style={styles.detailLabel}>Usage Roles:</div>
+          <div style={styles.rolesList}>
+            {usageSummary.usage_roles.map((role, i) => (
+              <div key={i} style={styles.roleItem}>
+                <div style={styles.roleName}>{role.role_name}</div>
+                <div style={styles.roleDescription}>{role.description}</div>
+                {role.how_dependency_is_used && (
+                  <div style={styles.roleHow}>{role.how_dependency_is_used}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Responsibilities Provided */}
+      {usageSummary.responsibilities_provided_by_dependency &&
+       usageSummary.responsibilities_provided_by_dependency.length > 0 && (
+        <div style={styles.detailBlock}>
+          <div style={styles.detailLabel}>Responsibilities provided by dependency:</div>
+          <ul style={styles.bulletList}>
+            {usageSummary.responsibilities_provided_by_dependency.map((resp, i) => (
+              <li key={i} style={styles.bulletItem}>{resp}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Responsibilities Left to Parent */}
+      {usageSummary.responsibilities_left_to_parent &&
+       usageSummary.responsibilities_left_to_parent.length > 0 && (
+        <div style={styles.detailBlock}>
+          <div style={styles.detailLabel}>Responsibilities left to parent:</div>
+          <ul style={styles.bulletList}>
+            {usageSummary.responsibilities_left_to_parent.map((resp, i) => (
+              <li key={i} style={styles.bulletItem}>{resp}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* Notes */}
+      {usageSummary.notes && usageSummary.notes.length > 0 && (
+        <div style={styles.detailBlock}>
+          <div style={styles.detailLabel}>Notes:</div>
+          <ul style={styles.bulletList}>
+            {usageSummary.notes.map((note, i) => (
+              <li key={i} style={styles.bulletItem}>{note}</li>
             ))}
           </ul>
         </div>
@@ -252,18 +319,59 @@ const styles = {
   },
   detailsSection: {
     marginTop: '16px',
-    padding: '12px',
+    padding: '16px',
     backgroundColor: '#f7fafc',
     borderRadius: '6px',
     fontSize: '14px',
   },
-  detailRow: {
-    marginBottom: '8px',
+  detailBlock: {
+    marginBottom: '16px',
+  },
+  detailLabel: {
+    fontWeight: '600',
+    color: '#2d3748',
+    marginBottom: '6px',
+    fontSize: '13px',
+    textTransform: 'uppercase',
+    letterSpacing: '0.5px',
+  },
+  detailValue: {
     color: '#4a5568',
+    lineHeight: '1.5',
   },
   rolesList: {
-    marginTop: '4px',
+    marginTop: '8px',
+  },
+  roleItem: {
+    marginBottom: '12px',
+    paddingBottom: '12px',
+    borderBottom: '1px solid #e2e8f0',
+  },
+  roleName: {
+    fontWeight: '600',
+    color: '#2d3748',
+    marginBottom: '4px',
+  },
+  roleDescription: {
+    color: '#4a5568',
+    marginBottom: '4px',
+    lineHeight: '1.5',
+  },
+  roleHow: {
+    color: '#718096',
+    fontSize: '13px',
+    fontStyle: 'italic',
+    lineHeight: '1.5',
+  },
+  bulletList: {
+    marginTop: '8px',
     paddingLeft: '20px',
+    listStyleType: 'disc',
+  },
+  bulletItem: {
+    color: '#4a5568',
+    marginBottom: '6px',
+    lineHeight: '1.5',
   },
   buttonSection: {
     marginTop: '32px',
