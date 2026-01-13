@@ -8,11 +8,14 @@ export default function ComparisonScreenLevel3({
   comparisonIndex,
   totalComparisons,
   onSubmit,
-  isSubmitting
+  isSubmitting,
+  isCompleted
 }) {
   const [parentSummaryOpen, setParentSummaryOpen] = useState(false)
   const [depADetailsOpen, setDepADetailsOpen] = useState(false)
   const [depBDetailsOpen, setDepBDetailsOpen] = useState(false)
+  const [wasSkipped, setWasSkipped] = useState(false)
+  const [lastSubmittedAt, setLastSubmittedAt] = useState(null)
 
   // Get data
   const parentSummary = getRepositorySummary(repoUrl)
@@ -22,14 +25,42 @@ export default function ComparisonScreenLevel3({
   const parentName = repoUrl.replace('https://github.com/', '')
   const multiplierText = comparison.multiplier.toLocaleString('en-US', { maximumFractionDigits: 1 })
 
-  const handleAnswer = (agrees) => {
-    onSubmit({
+  const handleAnswer = async (agrees) => {
+    setWasSkipped(false)
+    setLastSubmittedAt(new Date().toISOString())
+
+    await onSubmit({
       comparisonIndex,
       depA: comparison.depA,
       depB: comparison.depB,
       multiplier: comparison.multiplier,
-      userAgrees: agrees
+      userAgrees: agrees,
+      wasSkipped: false
     })
+
+    // Auto-dismiss success message
+    setTimeout(() => {
+      setLastSubmittedAt(null)
+    }, 3000)
+  }
+
+  const handleSkip = async () => {
+    setWasSkipped(true)
+    setLastSubmittedAt(new Date().toISOString())
+
+    await onSubmit({
+      comparisonIndex,
+      depA: comparison.depA,
+      depB: comparison.depB,
+      multiplier: comparison.multiplier,
+      userAgrees: null,
+      wasSkipped: true
+    })
+
+    // Auto-dismiss success message
+    setTimeout(() => {
+      setLastSubmittedAt(null)
+    }, 3000)
   }
 
   if (!depA || !depB) {
@@ -101,8 +132,25 @@ export default function ComparisonScreenLevel3({
         )}
       </div>
 
+      {/* Submission Status */}
+      {lastSubmittedAt && (
+        <div style={styles.submissionStatus}>
+          ✓ {wasSkipped ? 'Skipped' : 'Comparison recorded'}
+        </div>
+      )}
+
       {/* Answer Buttons */}
       <div style={styles.buttonSection}>
+        {!isCompleted && (
+          <button
+            onClick={handleSkip}
+            disabled={isSubmitting}
+            style={{...styles.button, ...styles.buttonSkip}}
+          >
+            Skip this comparison
+          </button>
+        )}
+
         <button
           onClick={() => handleAnswer(true)}
           disabled={isSubmitting}
@@ -373,6 +421,16 @@ const styles = {
     marginBottom: '6px',
     lineHeight: '1.5',
   },
+  submissionStatus: {
+    marginTop: '24px',
+    padding: '12px 16px',
+    backgroundColor: '#c6f6d5',
+    color: '#22543d',
+    borderRadius: '6px',
+    textAlign: 'center',
+    fontSize: '14px',
+    fontWeight: '500',
+  },
   buttonSection: {
     marginTop: '32px',
     display: 'flex',
@@ -395,6 +453,11 @@ const styles = {
   buttonNo: {
     backgroundColor: '#f56565',
     color: 'white',
+  },
+  buttonSkip: {
+    backgroundColor: '#f7fafc',
+    color: '#4a5568',
+    border: '1px solid #cbd5e0',
   },
   progress: {
     marginTop: '24px',

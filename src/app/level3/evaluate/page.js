@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useCallback, Suspense } from 'react'
 import ComparisonScreenLevel3 from '@/components/ComparisonScreenLevel3'
+import { NavigationSidebar } from '@/components/NavigationSidebar'
 
 function EvaluatePageContent() {
   const { user, isLoggedIn, isLoading, logout } = useAuth()
@@ -11,10 +12,12 @@ function EvaluatePageContent() {
   const repoUrl = searchParams.get('repo')
 
   const [evaluationState, setEvaluationState] = useState(null)
+  const [navigationState, setNavigationState] = useState(null)
   const [currentComparisonIndex, setCurrentComparisonIndex] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   // Redirect if not logged in
   useEffect(() => {
@@ -48,48 +51,58 @@ function EvaluatePageContent() {
     }
   }, [repoUrl])
 
-  // Load evaluation state
+  // Load evaluation and navigation state
   useEffect(() => {
-    if (!repoUrl || !isLoggedIn) return
+    if (!repoUrl || !isLoggedIn || !user?.address) return
 
-    async function loadEvaluationState() {
+    async function loadState() {
       try {
-        const response = await fetch(`/api/level3/evaluation-state?repoUrl=${encodeURIComponent(repoUrl)}`)
-        const data = await response.json()
+        // Load evaluation state (plan and comparisons)
+        const evalResponse = await fetch(`/api/level3/evaluation-state?repoUrl=${encodeURIComponent(repoUrl)}`)
+        const evalData = await evalResponse.json()
 
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to load evaluation state')
+        if (!evalResponse.ok) {
+          throw new Error(evalData.error || 'Failed to load evaluation state')
         }
 
         // If no plan exists, generate one
-        if (!data.plan) {
+        if (!evalData.plan) {
           await generatePlan()
           return
         }
 
-        setEvaluationState(data)
+        setEvaluationState(evalData)
 
-        // Find the first uncompleted comparison
-        const completedIndices = new Set(data.comparisons.map(c => c.comparisonIndex))
-        const firstUncompleted = data.plan.comparisons.findIndex((_, i) => !completedIndices.has(i))
+        // Load navigation state
+        const navResponse = await fetch(`/api/level3/navigation-state?repoUrl=${encodeURIComponent(repoUrl)}&userAddress=${user.address}`)
+        const navData = await navResponse.json()
 
-        if (firstUncompleted >= 0) {
-          setCurrentComparisonIndex(firstUncompleted)
-        } else {
-          // All comparisons completed
-          setCurrentComparisonIndex(data.plan.comparisons.length)
+        if (!navResponse.ok) {
+          throw new Error(navData.error || 'Failed to load navigation state')
+        }
+
+        setNavigationState(navData)
+
+        // Set current comparison index from navigation state
+        if (navData.currentScreen && navData.currentScreen !== 'completion') {
+          const match = navData.currentScreen.match(/comparison_(\d+)/)
+          if (match) {
+            setCurrentComparisonIndex(parseInt(match[1]))
+          }
+        } else if (navData.currentScreen === 'completion') {
+          setCurrentComparisonIndex(evalData.plan.comparisons.length)
         }
 
         setLoading(false)
       } catch (err) {
-        console.error('Error loading evaluation state:', err)
+        console.error('Error loading state:', err)
         setError(err.message)
         setLoading(false)
       }
     }
 
-    loadEvaluationState()
-  }, [repoUrl, isLoggedIn, generatePlan])
+    loadState()
+  }, [repoUrl, isLoggedIn, user?.address, generatePlan])
 
   async function handleSubmitComparison(comparisonData) {
     setIsSubmitting(true)
@@ -110,19 +123,73 @@ function EvaluatePageContent() {
         throw new Error(data.error || 'Failed to submit comparison')
       }
 
-      // Update local state
+      // Reload navigation state
+      const navResponse = await fetch(`/api/level3/navigation-state?repoUrl=${encodeURIComponent(repoUrl)}&userAddress=${user.address}`)
+      const navData = await navResponse.json()
+
+      if (navResponse.ok) {
+        setNavigationState(navData)
+
+        // Update current comparison index from navigation
+        if (navData.currentScreen && navData.currentScreen !== 'completion') {
+          const match = navData.currentScreen.match(/comparison_(\d+)/)
+          if (match) {
+            setCurrentComparisonIndex(parseInt(match[1]))
+          }
+        } else if (navData.currentScreen === 'completion') {
+          setCurrentComparisonIndex(evaluationState.plan.comparisons.length)
+        }
+      }
+
+      // Update local evaluation state
       setEvaluationState(prev => ({
         ...prev,
         comparisons: [...prev.comparisons.filter(c => c.comparisonIndex !== comparisonData.comparisonIndex), comparisonData]
       }))
-
-      // Move to next comparison
-      setCurrentComparisonIndex(prev => prev + 1)
     } catch (err) {
       console.error('Error submitting comparison:', err)
       alert(`Error: ${err.message}`)
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  async function handleNavigateToComparison(screenId) {
+    try {
+      // Navigate via API
+      const response = await fetch('/api/level3/navigation-state', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userAddress: user.address,
+          repoUrl,
+          action: 'navigate-to',
+          screenId
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to navigate')
+      }
+
+      setNavigationState(data)
+
+      // Update current comparison index
+      if (screenId !== 'completion') {
+        const match = screenId.match(/comparison_(\d+)/)
+        if (match) {
+          setCurrentComparisonIndex(parseInt(match[1]))
+        }
+      } else {
+        setCurrentComparisonIndex(evaluationState.plan.comparisons.length)
+      }
+
+      setIsMobileMenuOpen(false)
+    } catch (err) {
+      console.error('Error navigating:', err)
+      alert(`Error: ${err.message}`)
     }
   }
 
@@ -189,7 +256,7 @@ function EvaluatePageContent() {
     )
   }
 
-  if (!evaluationState || !evaluationState.plan) {
+  if (!evaluationState || !evaluationState.plan || !navigationState) {
     return (
       <div style={styles.container}>
         <div style={styles.loading}>Preparing evaluation...</div>
@@ -205,7 +272,14 @@ function EvaluatePageContent() {
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
-        <h1 style={styles.title}>Verdict</h1>
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="hamburger-button"
+          aria-label="Open navigation menu"
+        >
+          ☰
+        </button>
+        <h1 style={styles.title}>Verdict - Level 3</h1>
         <div style={styles.userInfo}>
           <span style={styles.address}>{user?.ensName}</span>
           <button onClick={handleLogout} style={styles.logoutButton}>
@@ -214,8 +288,17 @@ function EvaluatePageContent() {
         </div>
       </div>
 
-      {/* Main Content */}
-      <div style={styles.content}>
+      {/* Body with Sidebar */}
+      <div style={styles.bodyContainer}>
+        <NavigationSidebar
+          navigationItems={navigationState.navigationItems}
+          currentScreen={navigationState.currentScreen}
+          onNavigate={handleNavigateToComparison}
+          isMobileMenuOpen={isMobileMenuOpen}
+          onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+        />
+
+        <div style={styles.mainContent}>
         {isComplete ? (
           <div style={styles.completionSection}>
             <h2 style={styles.completionTitle}>✓ Evaluation Complete</h2>
@@ -242,14 +325,34 @@ function EvaluatePageContent() {
             totalComparisons={plan.comparisons.length}
             onSubmit={handleSubmitComparison}
             isSubmitting={isSubmitting}
+            isCompleted={navigationState.navigationItems.find(i => i.id === `comparison_${currentComparisonIndex}`)?.status === 'completed'}
           />
         )}
+        </div>
       </div>
 
       {/* Version */}
       <div style={styles.versionInfo}>
         v{process.env.NEXT_PUBLIC_GIT_COMMIT?.slice(0, 7) || 'dev'}
       </div>
+
+      <style jsx>{`
+        .hamburger-button {
+          display: none;
+          background-color: transparent;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+          padding: 8px;
+          color: #333;
+        }
+
+        @media (max-width: 768px) {
+          .hamburger-button {
+            display: block;
+          }
+        }
+      `}</style>
     </div>
   )
 }
@@ -280,6 +383,17 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    width: '100%',
+    zIndex: 101,
+    gap: '12px',
+  },
+  bodyContainer: {
+    display: 'flex',
+    flex: 1,
+  },
+  mainContent: {
+    flex: 1,
+    overflow: 'auto',
   },
   title: {
     fontSize: '24px',
@@ -305,10 +419,6 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '14px',
-  },
-  content: {
-    flex: 1,
-    padding: '24px',
   },
   loading: {
     display: 'flex',
