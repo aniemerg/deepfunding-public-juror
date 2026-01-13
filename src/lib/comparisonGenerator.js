@@ -56,9 +56,10 @@ function calculateDistanceWeights(fromIndex, totalCount) {
  * Generate comparison pairs for a repository
  * @param {Array<{url: string, weight: number}>} dependencies - Sorted dependencies (by weight_rank)
  * @param {number} targetCount - Target number of comparisons (default 10)
+ * @param {Array<{depA: string, depB: string}>} existingComparisons - Optional existing comparisons to avoid duplicates
  * @returns {Array<{depA: string, depB: string, multiplier: number}>} Comparison pairs
  */
-export function generateComparisons(dependencies, targetCount = 10) {
+export function generateComparisons(dependencies, targetCount = 10, existingComparisons = []) {
   if (!dependencies || dependencies.length < 2) {
     return []
   }
@@ -69,6 +70,19 @@ export function generateComparisons(dependencies, targetCount = 10) {
 
   const comparisons = []
   const usedPairs = new Set()
+
+  // Add existing comparison pairs to usedPairs set to avoid duplicates
+  existingComparisons.forEach(comp => {
+    // Find indices of these dependencies
+    const indexA = dependencies.findIndex(d => d.url === comp.depA)
+    const indexB = dependencies.findIndex(d => d.url === comp.depB)
+
+    if (indexA !== -1 && indexB !== -1) {
+      // Create canonical pair key (smaller index first)
+      const pairKey = indexA < indexB ? `${indexA}-${indexB}` : `${indexB}-${indexA}`
+      usedPairs.add(pairKey)
+    }
+  })
 
   // Pre-compute weights for first selection (use actual dependency weights)
   const selectionWeights = dependencies.map(d => d.weight)

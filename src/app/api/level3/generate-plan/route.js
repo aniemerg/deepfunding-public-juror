@@ -48,8 +48,8 @@ export async function POST(req) {
       // Append more comparisons to existing plan
       const existingPlan = JSON.parse(existingPlanData)
 
-      // Generate 10 more comparisons
-      const newComparisons = generateComparisons(dependencies, 10)
+      // Generate 10 more comparisons, avoiding duplicates
+      const newComparisons = generateComparisons(dependencies, 10, existingPlan.comparisons)
 
       // Append to existing comparisons
       plan = {
@@ -60,7 +60,7 @@ export async function POST(req) {
         updatedAt: new Date().toISOString()
       }
 
-      console.log(`Appended 10 more comparisons to existing plan for ${session.user.ensName || userAddress}: ${repoUrl} (now ${plan.totalComparisons} total)`)
+      console.log(`Appended ${newComparisons.length} more comparisons to existing plan for ${session.user.ensName || userAddress}: ${repoUrl} (now ${plan.totalComparisons} total)`)
     } else {
       // Create new plan
       const comparisonCount = calculateComparisonCount(dependencies.length)
