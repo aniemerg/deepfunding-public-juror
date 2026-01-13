@@ -36,31 +36,55 @@ export async function POST(req) {
       }, { status: 400 })
     }
 
-    // Calculate how many comparisons to generate
-    const comparisonCount = calculateComparisonCount(dependencies.length)
-
-    // Generate comparisons
-    const comparisons = generateComparisons(dependencies, comparisonCount)
-
-    // Create plan object
-    const plan = {
-      planId: generatePlanId(repoUrl, planNumber),
-      repoUrl,
-      planNumber,
-      comparisons,
-      totalComparisons: comparisons.length,
-      completedComparisons: 0,
-      createdAt: new Date().toISOString()
-    }
-
-    // Save plan to KV
     const kv = getCloudflareContext().env.JURY_DATA
     const userAddress = session.user.address.toLowerCase()
     const kvKey = `user:${userAddress}:level3:${encodeURIComponent(repoUrl)}:plan`
 
+    // Check if a plan already exists
+    const existingPlanData = await kv.get(kvKey)
+    let plan
+
+    if (existingPlanData && planNumber > 0) {
+      // Append more comparisons to existing plan
+      const existingPlan = JSON.parse(existingPlanData)
+
+      // Generate 10 more comparisons
+      const newComparisons = generateComparisons(dependencies, 10)
+
+      // Append to existing comparisons
+      plan = {
+        ...existingPlan,
+        planNumber,
+        comparisons: [...existingPlan.comparisons, ...newComparisons],
+        totalComparisons: existingPlan.comparisons.length + newComparisons.length,
+        updatedAt: new Date().toISOString()
+      }
+
+      console.log(`Appended 10 more comparisons to existing plan for ${session.user.ensName || userAddress}: ${repoUrl} (now ${plan.totalComparisons} total)`)
+    } else {
+      // Create new plan
+      const comparisonCount = calculateComparisonCount(dependencies.length)
+      const comparisons = generateComparisons(dependencies, comparisonCount)
+
+      plan = {
+        planId: generatePlanId(repoUrl, planNumber),
+        repoUrl,
+        planNumber,
+        comparisons,
+        totalComparisons: comparisons.length,
+        completedComparisons: 0,
+        createdAt: new Date().toISOString()
+      }
+
+      console.log(`Generated new Level 3 plan for ${session.user.ensName || userAddress}: ${repoUrl} (${comparisons.length} comparisons)`)
+    }
+
+    // Save plan to KV
     await kv.put(kvKey, JSON.stringify(plan))
 
-    console.log(`Generated Level 3 plan for ${session.user.ensName || userAddress}: ${repoUrl} (${comparisons.length} comparisons)`)
+    // Clear navigation cache to force refresh
+    const navCacheKey = `user:${userAddress}:level3:${encodeURIComponent(repoUrl)}:navigation-state`
+    await kv.delete(navCacheKey)
 
     return Response.json({
       success: true,
