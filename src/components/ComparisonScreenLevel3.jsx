@@ -141,6 +141,25 @@ export default function ComparisonScreenLevel3({
 
       {/* Answer Buttons */}
       <div style={styles.buttonSection}>
+        <div className="answerButtons" style={styles.answerButtons}>
+          <button
+            onClick={() => handleAnswer(true)}
+            disabled={isSubmitting}
+            style={{...styles.button, ...styles.buttonYes}}
+          >
+            <span style={styles.buttonLabel}>Yes</span>
+            <span style={styles.buttonText}>{depA.name} is {multiplierText}× or more</span>
+          </button>
+          <button
+            onClick={() => handleAnswer(false)}
+            disabled={isSubmitting}
+            style={{...styles.button, ...styles.buttonNo}}
+          >
+            <span style={styles.buttonLabel}>No</span>
+            <span style={styles.buttonText}>{depA.name} is less than {multiplierText}×</span>
+          </button>
+        </div>
+
         {!isCompleted && (
           <button
             onClick={handleSkip}
@@ -150,27 +169,20 @@ export default function ComparisonScreenLevel3({
             Skip this comparison
           </button>
         )}
-
-        <button
-          onClick={() => handleAnswer(true)}
-          disabled={isSubmitting}
-          style={{...styles.button, ...styles.buttonYes}}
-        >
-          Yes, {depA.name} is {multiplierText}× or more
-        </button>
-        <button
-          onClick={() => handleAnswer(false)}
-          disabled={isSubmitting}
-          style={{...styles.button, ...styles.buttonNo}}
-        >
-          No, {depA.name} is less than {multiplierText}×
-        </button>
       </div>
 
       {/* Progress */}
       <div style={styles.progress}>
         Progress: {comparisonIndex + 1} / {totalComparisons} comparisons
       </div>
+
+      <style jsx>{`
+        @media (max-width: 768px) {
+          .answerButtons {
+            flex-direction: column !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }
@@ -435,16 +447,41 @@ const styles = {
     marginTop: '32px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '16px',
+    alignItems: 'center',
+  },
+  answerButtons: {
+    display: 'flex',
+    gap: '16px',
+    width: '100%',
+    maxWidth: '700px',
+    justifyContent: 'center',
   },
   button: {
-    padding: '16px 24px',
+    padding: '20px 32px',
     fontSize: '16px',
     fontWeight: '500',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '6px',
+    minHeight: '80px',
+    flex: 1,
+    maxWidth: '320px',
+  },
+  buttonLabel: {
+    fontSize: '18px',
+    fontWeight: '600',
+  },
+  buttonText: {
+    fontSize: '14px',
+    fontWeight: '400',
+    textAlign: 'center',
+    lineHeight: '1.4',
   },
   buttonYes: {
     backgroundColor: '#48bb78',
@@ -458,6 +495,9 @@ const styles = {
     backgroundColor: '#f7fafc',
     color: '#4a5568',
     border: '1px solid #cbd5e0',
+    padding: '12px 24px',
+    minHeight: 'auto',
+    maxWidth: '240px',
   },
   progress: {
     marginTop: '24px',
