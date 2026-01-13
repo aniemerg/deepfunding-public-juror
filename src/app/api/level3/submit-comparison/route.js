@@ -25,10 +25,16 @@ export async function POST(req) {
       return Response.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const { repoUrl, comparisonIndex, depA, depB, multiplier, userAgrees } = await req.json()
+    const { repoUrl, comparisonIndex, depA, depB, multiplier, userAgrees, wasSkipped } = await req.json()
 
-    if (!repoUrl || comparisonIndex === undefined || !depA || !depB || multiplier === undefined || userAgrees === undefined) {
+    // Validate required fields - allow skip without userAgrees
+    if (!repoUrl || comparisonIndex === undefined) {
       return Response.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+
+    // If not skipped, require comparison data
+    if (!wasSkipped && (!depA || !depB || multiplier === undefined || userAgrees === undefined)) {
+      return Response.json({ error: 'Missing required comparison fields' }, { status: 400 })
     }
 
     const kv = getCloudflareContext().env.JURY_DATA
@@ -38,10 +44,11 @@ export async function POST(req) {
     const comparison = {
       repoUrl,
       comparisonIndex,
-      depA,
-      depB,
-      multiplier,
-      userAgrees,
+      depA: depA || null,
+      depB: depB || null,
+      multiplier: multiplier || null,
+      userAgrees: userAgrees !== undefined ? userAgrees : null,
+      wasSkipped: wasSkipped || false,
       timestamp: new Date().toISOString()
     }
 
@@ -62,17 +69,36 @@ export async function POST(req) {
 
     await kv.put(comparisonKey, JSON.stringify(comparisons))
 
+    // Mark as completed in completion tracking (for navigation)
+    const screenId = `comparison_${comparisonIndex}`
+    const completedKey = `user:${userAddress}:level3:${encodeURIComponent(repoUrl)}:completed:${screenId}`
+    const inProgressKey = `user:${userAddress}:level3:${encodeURIComponent(repoUrl)}:in-progress:${screenId}`
+
+    await kv.delete(inProgressKey)
+    await kv.put(completedKey, JSON.stringify({
+      completed: true,
+      wasSkipped: wasSkipped || false,
+      timestamp: new Date().toISOString(),
+      data: comparison
+    }))
+
+    // Clear navigation state cache to force refresh
+    const navCacheKey = `user:${userAddress}:level3:${encodeURIComponent(repoUrl)}:navigation-state`
+    await kv.delete(navCacheKey)
+
     // Update plan progress
     const planKey = `user:${userAddress}:level3:${encodeURIComponent(repoUrl)}:plan`
     const planData = await kv.get(planKey)
 
     if (planData) {
       const plan = JSON.parse(planData)
-      plan.completedComparisons = comparisons.length
+      plan.completedComparisons = comparisons.filter(c => !c.wasSkipped).length
+      plan.skippedComparisons = comparisons.filter(c => c.wasSkipped).length
       await kv.put(planKey, JSON.stringify(plan))
     }
 
-    console.log(`Level 3 comparison submitted by ${session.user.ensName}: ${depA} vs ${depB} (agrees: ${userAgrees})`)
+    const action = wasSkipped ? 'skipped' : `agreed: ${userAgrees}`
+    console.log(`Level 3 comparison by ${session.user.ensName}: ${depA || '(skipped)'} vs ${depB || '(skipped)'} (${action})`)
 
     return Response.json({
       success: true,

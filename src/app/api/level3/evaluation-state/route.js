@@ -36,9 +36,29 @@ export async function GET(req) {
     const comparisonData = await kv.get(comparisonKey)
     const comparisons = comparisonData ? JSON.parse(comparisonData) : []
 
+    // Get completion status for each comparison (includes skip status)
+    const completionStatus = {}
+    if (plan) {
+      for (let i = 0; i < plan.comparisons.length; i++) {
+        const screenId = `comparison_${i}`
+        const completedKey = `user:${userAddress}:level3:${encodeURIComponent(repoUrl)}:completed:${screenId}`
+        const completedData = await kv.get(completedKey)
+
+        if (completedData) {
+          const parsed = JSON.parse(completedData)
+          completionStatus[screenId] = {
+            completed: parsed.completed,
+            wasSkipped: parsed.wasSkipped || false,
+            timestamp: parsed.timestamp
+          }
+        }
+      }
+    }
+
     return Response.json({
       plan,
       comparisons,
+      completionStatus,
       hasData: !!plan
     })
   } catch (error) {
