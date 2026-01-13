@@ -26,6 +26,18 @@ function EvaluatePageContent() {
     }
   }, [isLoading, isLoggedIn, router])
 
+  // Reset state when repo changes
+  useEffect(() => {
+    if (repoUrl) {
+      setLoading(true)
+      setError(null)
+      setEvaluationState(null)
+      setNavigationState(null)
+      setCurrentComparisonIndex(0)
+      setIsSubmitting(false)
+    }
+  }, [repoUrl])
+
   // Generate plan function
   const generatePlan = useCallback(async () => {
     try {
@@ -42,14 +54,25 @@ function EvaluatePageContent() {
       }
 
       setEvaluationState({ plan: data.plan, comparisons: [] })
-      setCurrentComparisonIndex(0)
+
+      // Also load navigation state for the new plan
+      if (user?.address) {
+        const navResponse = await fetch(`/api/level3/navigation-state?repoUrl=${encodeURIComponent(repoUrl)}&userAddress=${user.address}`)
+        const navData = await navResponse.json()
+
+        if (navResponse.ok) {
+          setNavigationState(navData)
+          setCurrentComparisonIndex(0)
+        }
+      }
+
       setLoading(false)
     } catch (err) {
       console.error('Error generating plan:', err)
       setError(err.message)
       setLoading(false)
     }
-  }, [repoUrl])
+  }, [repoUrl, user?.address])
 
   // Load evaluation and navigation state
   useEffect(() => {
