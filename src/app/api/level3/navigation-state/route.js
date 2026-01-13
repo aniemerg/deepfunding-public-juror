@@ -1,4 +1,5 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare"
+import { getDependency } from '@/lib/comprehensiveDependencyDataset'
 
 export async function GET(req) {
   const url = new URL(req.url)
@@ -162,10 +163,17 @@ function createNavigationFromPlan(plan, completedScreens, skippedScreens, inProg
   // Add comparison items
   plan.comparisons.forEach((comparison, index) => {
     const id = `comparison_${index}`
+
+    // Get dependency names for display
+    const depAObj = getDependency(plan.repoUrl, comparison.depA)
+    const depBObj = getDependency(plan.repoUrl, comparison.depB)
+    const depAName = depAObj?.name || comparison.depA.split('/').pop() || comparison.depA
+    const depBName = depBObj?.name || comparison.depB.split('/').pop() || comparison.depB
+
     items.push({
       id,
       screenType: 'level3_comparison',
-      text: `Comparison: ${comparison.depA} vs ${comparison.depB}`,
+      text: `Comparison: ${depAName} vs ${depBName}`,
       status: getStatus(id),
       data: {
         comparisonIndex: index,
