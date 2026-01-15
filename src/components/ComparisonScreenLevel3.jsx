@@ -103,7 +103,12 @@ export default function ComparisonScreenLevel3({
       {/* Dependency A Card */}
       <div style={styles.depCard}>
         <div style={styles.depHeader} onClick={() => setDepADetailsOpen(!depADetailsOpen)}>
-          <span style={styles.depName}>{depA.name}</span>
+          <div style={styles.depHeaderContent}>
+            <span style={styles.depName}>{depA.name}</span>
+            {!depADetailsOpen && depA.summary && (
+              <p style={styles.depSummary}>{depA.summary}</p>
+            )}
+          </div>
           <span style={styles.expandIcon}>{depADetailsOpen ? '▼' : '▶'} Show details</span>
         </div>
         {depADetailsOpen && (
@@ -119,7 +124,12 @@ export default function ComparisonScreenLevel3({
       {/* Dependency B Card */}
       <div style={styles.depCard}>
         <div style={styles.depHeader} onClick={() => setDepBDetailsOpen(!depBDetailsOpen)}>
-          <span style={styles.depName}>{depB.name}</span>
+          <div style={styles.depHeaderContent}>
+            <span style={styles.depName}>{depB.name}</span>
+            {!depBDetailsOpen && depB.summary && (
+              <p style={styles.depSummary}>{depB.summary}</p>
+            )}
+          </div>
           <span style={styles.expandIcon}>{depBDetailsOpen ? '▼' : '▶'} Show details</span>
         </div>
         {depBDetailsOpen && (
@@ -314,6 +324,8 @@ const styles = {
   expandIcon: {
     fontSize: '14px',
     color: '#718096',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
   },
   parentSummary: {
     padding: '16px',
@@ -357,15 +369,27 @@ const styles = {
   depHeader: {
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: '16px 20px',
     cursor: 'pointer',
+  },
+  depHeaderContent: {
+    flex: 1,
+    marginRight: '16px',
   },
   depName: {
     fontSize: '16px',
     fontWeight: '500',
     color: '#2d3748',
     fontFamily: 'monospace',
+    marginBottom: '8px',
+    display: 'block',
+  },
+  depSummary: {
+    fontSize: '14px',
+    lineHeight: '1.5',
+    color: '#4a5568',
+    margin: '8px 0 0 0',
   },
   depDetails: {
     padding: '0 20px 16px 20px',
