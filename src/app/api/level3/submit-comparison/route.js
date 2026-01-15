@@ -2,6 +2,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { getIronSession } from 'iron-session'
 import { sessionOptions } from '@/lib/session'
 import { cookies } from 'next/headers'
+import { submitDependencyComparisonData } from '@/lib/googleSheets'
 
 /**
  * Submit a Level 3 comparison result
@@ -99,6 +100,24 @@ export async function POST(req) {
 
     const action = wasSkipped ? 'skipped' : `agreed: ${userAgrees}`
     console.log(`Level 3 comparison by ${session.user.ensName}: ${depA || '(skipped)'} vs ${depB || '(skipped)'} (${action})`)
+
+    // Submit to Google Sheets
+    try {
+      await submitDependencyComparisonData(getCloudflareContext().env, {
+        ensName: session.user.ensName,
+        repoUrl,
+        comparisonNumber: comparisonIndex,
+        depA,
+        depB,
+        multiplier,
+        userAgrees,
+        wasSkipped
+      })
+      console.log(`Level 3 comparison submitted to Google Sheets by ${session.user.ensName}`)
+    } catch (sheetsError) {
+      // Log but don't fail the request if Sheets submission fails
+      console.error('Failed to submit Level 3 comparison to Google Sheets:', sheetsError)
+    }
 
     return Response.json({
       success: true,
