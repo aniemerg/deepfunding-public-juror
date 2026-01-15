@@ -123,6 +123,7 @@ export function getDependency(repoUrl, depUrl) {
     weight: depData.weight,
     weight_rank: depData.weight_rank,
     usage_summary: depData.usage_summary,
+    summary: depData.summary, // ~50-word GPT summary of what this dependency does
     description: generateDescription(depData.usage_summary)
   }
 }
