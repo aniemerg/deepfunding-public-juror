@@ -258,6 +258,29 @@ export async function submitTopProjectsData(env, { ensName, selectedRepos, scree
   return await appendToSheet(env, accessToken, sheetName, values);
 }
 
+// Submit Level 3 dependency comparison data
+export async function submitDependencyComparisonData(env, { ensName, repoUrl, comparisonNumber, depA, depB, multiplier, userAgrees, wasSkipped }) {
+  const accessToken = await getAccessToken(env);
+  const submissionId = generateSubmissionId();
+  const sheetName = "DependencyComparisons";
+
+  const values = [
+    submissionId,
+    1, // version
+    ensName,
+    new Date().toISOString(),
+    wasSkipped ? 'TRUE' : 'FALSE',
+    repoUrl,
+    comparisonNumber.toString(),
+    depA || '',
+    depB || '',
+    multiplier ? multiplier.toString() : '',
+    userAgrees === null ? '' : (userAgrees ? 'TRUE' : 'FALSE')
+  ];
+
+  return await appendToSheet(env, accessToken, sheetName, values);
+}
+
 // Submit repo selection data
 export async function submitRepoSelectionData(env, { ensName, initialRepos, vetoedRepos, finalRepos, reasoning }) {
   const accessToken = await getAccessToken(env);
