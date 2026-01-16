@@ -157,7 +157,8 @@ export default function ComparisonScreenLevel3({
             disabled={isSubmitting}
             style={{...styles.button, ...styles.buttonYes}}
           >
-            <span style={styles.buttonLabel}>Yes</span>
+            <span style={styles.buttonIcon}>▲</span>
+            <span style={styles.buttonLabel}>Agree</span>
             <span style={styles.buttonText}>{depA.name} is {multiplierText}× or more</span>
           </button>
           <button
@@ -165,7 +166,8 @@ export default function ComparisonScreenLevel3({
             disabled={isSubmitting}
             style={{...styles.button, ...styles.buttonNo}}
           >
-            <span style={styles.buttonLabel}>No</span>
+            <span style={styles.buttonIcon}>▼</span>
+            <span style={styles.buttonLabel}>Disagree</span>
             <span style={styles.buttonText}>{depA.name} is less than {multiplierText}×</span>
           </button>
         </div>
@@ -492,20 +494,27 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '6px',
+    gap: '4px',
     minHeight: '80px',
     flex: 1,
     maxWidth: '320px',
   },
+  buttonIcon: {
+    fontSize: '32px',
+    fontWeight: 'bold',
+    lineHeight: '1',
+  },
   buttonLabel: {
-    fontSize: '18px',
+    fontSize: '16px',
     fontWeight: '600',
+    marginTop: '4px',
   },
   buttonText: {
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: '400',
     textAlign: 'center',
     lineHeight: '1.4',
+    marginTop: '4px',
   },
   buttonYes: {
     backgroundColor: '#48bb78',
