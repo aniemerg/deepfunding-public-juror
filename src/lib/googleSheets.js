@@ -259,7 +259,7 @@ export async function submitTopProjectsData(env, { ensName, selectedRepos, scree
 }
 
 // Submit Level 3 dependency comparison data
-export async function submitDependencyComparisonData(env, { ensName, repoUrl, comparisonNumber, depA, depB, multiplier, userAgrees, wasSkipped }) {
+export async function submitDependencyComparisonData(env, { ensName, repoUrl, comparisonNumber, depA, depB, multiplier, userAgrees, wasSkipped, comment }) {
   const accessToken = await getAccessToken(env);
   const submissionId = generateSubmissionId();
   const sheetName = "DependencyComparisons";
@@ -275,7 +275,8 @@ export async function submitDependencyComparisonData(env, { ensName, repoUrl, co
     depA || '',
     depB || '',
     multiplier ? multiplier.toString() : '',
-    userAgrees === null ? '' : (userAgrees ? 'TRUE' : 'FALSE')
+    userAgrees === null ? '' : (userAgrees ? 'TRUE' : 'FALSE'),
+    comment || ''
   ];
 
   return await appendToSheet(env, accessToken, sheetName, values);

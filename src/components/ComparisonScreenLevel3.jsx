@@ -12,10 +12,11 @@ export default function ComparisonScreenLevel3({
   isCompleted
 }) {
   const [parentSummaryOpen, setParentSummaryOpen] = useState(false)
-  const [depADetailsOpen, setDepADetailsOpen] = useState(false)
-  const [depBDetailsOpen, setDepBDetailsOpen] = useState(false)
+  const [modalOpen, setModalOpen] = useState(null) // 'depA' or 'depB' or null
   const [wasSkipped, setWasSkipped] = useState(false)
   const [lastSubmittedAt, setLastSubmittedAt] = useState(null)
+  const [showCommentBox, setShowCommentBox] = useState(false)
+  const [comment, setComment] = useState('')
 
   // Get data
   const parentSummary = getRepositorySummary(repoUrl)
@@ -35,7 +36,8 @@ export default function ComparisonScreenLevel3({
       depB: comparison.depB,
       multiplier: comparison.multiplier,
       userAgrees: agrees,
-      wasSkipped: false
+      wasSkipped: false,
+      comment: comment.trim() || null
     })
 
     // Auto-dismiss success message
@@ -92,55 +94,75 @@ export default function ComparisonScreenLevel3({
         )}
       </div>
 
-      {/* Question */}
+      {/* Statement */}
       <div style={styles.questionSection}>
         <h2 style={styles.question}>
-          Is <span style={styles.highlight}>{depA.name}</span> {multiplierText}× more valuable to{' '}
-          {parentName} than <span style={styles.highlight}>{depB.name}</span>?
+          <span style={styles.highlight}>{depA.name}</span> is {multiplierText}× more valuable than{' '}
+          <span style={styles.highlight}>{depB.name}</span>
         </h2>
       </div>
 
-      {/* Dependency A Card */}
-      <div style={styles.depCard}>
-        <div style={styles.depHeader} onClick={() => setDepADetailsOpen(!depADetailsOpen)}>
+      {/* Dependency Cards Container */}
+      <div className="depCardsContainer" style={styles.depCardsContainer}>
+        {/* Dependency A Card */}
+        <div style={styles.depCard}>
           <div style={styles.depHeaderContent}>
             <span style={styles.depName}>{depA.name}</span>
-            {!depADetailsOpen && depA.summary && (
+            {depA.summary && (
               <p style={styles.depSummary}>{depA.summary}</p>
             )}
           </div>
-          <span style={styles.expandIcon}>{depADetailsOpen ? '▼' : '▶'} Show details</span>
+          <button
+            onClick={() => setModalOpen('depA')}
+            style={styles.moreButton}
+          >
+            + More
+          </button>
         </div>
-        {depADetailsOpen && (
-          <div style={styles.depDetails}>
-            <p style={styles.depDescription}>{depA.description}</p>
-            {depA.usage_summary && (
-              <DepDetails usageSummary={depA.usage_summary} />
-            )}
-          </div>
-        )}
-      </div>
 
-      {/* Dependency B Card */}
-      <div style={styles.depCard}>
-        <div style={styles.depHeader} onClick={() => setDepBDetailsOpen(!depBDetailsOpen)}>
+        {/* Dependency B Card */}
+        <div style={styles.depCard}>
           <div style={styles.depHeaderContent}>
             <span style={styles.depName}>{depB.name}</span>
-            {!depBDetailsOpen && depB.summary && (
+            {depB.summary && (
               <p style={styles.depSummary}>{depB.summary}</p>
             )}
           </div>
-          <span style={styles.expandIcon}>{depBDetailsOpen ? '▼' : '▶'} Show details</span>
+          <button
+            onClick={() => setModalOpen('depB')}
+            style={styles.moreButton}
+          >
+            + More
+          </button>
         </div>
-        {depBDetailsOpen && (
-          <div style={styles.depDetails}>
-            <p style={styles.depDescription}>{depB.description}</p>
-            {depB.usage_summary && (
-              <DepDetails usageSummary={depB.usage_summary} />
-            )}
-          </div>
-        )}
       </div>
+
+      {/* Details Modal */}
+      {modalOpen && (
+        <div style={styles.modalOverlay} onClick={() => setModalOpen(null)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h3 style={styles.modalTitle}>
+                {modalOpen === 'depA' ? depA.name : depB.name}
+              </h3>
+              <button
+                onClick={() => setModalOpen(null)}
+                style={styles.modalClose}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={styles.modalBody}>
+              <p style={styles.depDescription}>
+                {modalOpen === 'depA' ? depA.description : depB.description}
+              </p>
+              {(modalOpen === 'depA' ? depA.usage_summary : depB.usage_summary) && (
+                <DepDetails usageSummary={modalOpen === 'depA' ? depA.usage_summary : depB.usage_summary} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Submission Status */}
       {lastSubmittedAt && (
@@ -148,6 +170,30 @@ export default function ComparisonScreenLevel3({
           ✓ {wasSkipped ? 'Skipped' : 'Comparison recorded'}
         </div>
       )}
+
+      {/* Comment Section */}
+      <div style={styles.commentContainer}>
+        {!showCommentBox ? (
+          <button
+            onClick={() => setShowCommentBox(true)}
+            style={styles.commentLink}
+            disabled={isSubmitting}
+          >
+            Leave a comment (optional)
+          </button>
+        ) : (
+          <div style={styles.commentSection}>
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="Add any thoughts or reasoning about this comparison..."
+              style={styles.commentTextarea}
+              rows="3"
+              disabled={isSubmitting}
+            />
+          </div>
+        )}
+      </div>
 
       {/* Answer Buttons */}
       <div style={styles.buttonSection}>
@@ -158,7 +204,6 @@ export default function ComparisonScreenLevel3({
             style={{...styles.button, ...styles.buttonYes}}
           >
             <span style={styles.buttonIcon}>▲</span>
-            <span style={styles.buttonLabel}>Agree</span>
             <span style={styles.buttonText}>{depA.name} is {multiplierText}× or more</span>
           </button>
           <button
@@ -167,7 +212,6 @@ export default function ComparisonScreenLevel3({
             style={{...styles.button, ...styles.buttonNo}}
           >
             <span style={styles.buttonIcon}>▼</span>
-            <span style={styles.buttonLabel}>Disagree</span>
             <span style={styles.buttonText}>{depA.name} is less than {multiplierText}×</span>
           </button>
         </div>
@@ -191,6 +235,9 @@ export default function ComparisonScreenLevel3({
       <style jsx>{`
         @media (max-width: 768px) {
           .answerButtons {
+            flex-direction: column !important;
+          }
+          .depCardsContainer {
             flex-direction: column !important;
           }
         }
@@ -296,7 +343,7 @@ function DepDetails({ usageSummary }) {
 
 const styles = {
   container: {
-    maxWidth: '800px',
+    maxWidth: '1200px',
     margin: '0 auto',
     padding: '24px',
   },
@@ -322,12 +369,6 @@ const styles = {
     fontWeight: '600',
     color: '#2d3748',
     fontFamily: 'monospace',
-  },
-  expandIcon: {
-    fontSize: '14px',
-    color: '#718096',
-    whiteSpace: 'nowrap',
-    flexShrink: 0,
   },
   parentSummary: {
     padding: '16px',
@@ -362,40 +403,109 @@ const styles = {
     fontFamily: 'monospace',
     fontWeight: '600',
   },
-  depCard: {
+  depCardsContainer: {
+    display: 'flex',
+    gap: '16px',
     marginBottom: '16px',
+  },
+  depCard: {
+    flex: 1,
     border: '1px solid #e2e8f0',
     borderRadius: '8px',
     backgroundColor: 'white',
-  },
-  depHeader: {
+    padding: '20px',
     display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: '16px 20px',
-    cursor: 'pointer',
+    flexDirection: 'column',
+    alignItems: 'center',
   },
   depHeaderContent: {
-    flex: 1,
-    marginRight: '16px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: '16px',
   },
   depName: {
-    fontSize: '16px',
-    fontWeight: '500',
+    fontSize: '20px',
+    fontWeight: '600',
     color: '#2d3748',
     fontFamily: 'monospace',
     marginBottom: '8px',
     display: 'block',
+    textAlign: 'center',
   },
   depSummary: {
     fontSize: '14px',
     lineHeight: '1.5',
     color: '#4a5568',
     margin: '8px 0 0 0',
+    textAlign: 'center',
   },
-  depDetails: {
-    padding: '0 20px 16px 20px',
-    borderTop: '1px solid #f7fafc',
+  moreButton: {
+    padding: '8px 16px',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#3182ce',
+    backgroundColor: 'transparent',
+    border: '1px solid #3182ce',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    padding: '20px',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    maxWidth: '700px',
+    width: '100%',
+    maxHeight: '80vh',
+    overflow: 'auto',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+  },
+  modalHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '20px 24px',
+    borderBottom: '1px solid #e2e8f0',
+  },
+  modalTitle: {
+    fontSize: '20px',
+    fontWeight: '600',
+    color: '#2d3748',
+    fontFamily: 'monospace',
+    margin: 0,
+  },
+  modalClose: {
+    fontSize: '24px',
+    fontWeight: '400',
+    color: '#718096',
+    backgroundColor: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '0',
+    width: '32px',
+    height: '32px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '4px',
+    transition: 'background-color 0.15s ease',
+  },
+  modalBody: {
+    padding: '24px',
   },
   depDescription: {
     marginTop: '12px',
@@ -504,17 +614,12 @@ const styles = {
     fontWeight: 'bold',
     lineHeight: '1',
   },
-  buttonLabel: {
-    fontSize: '16px',
-    fontWeight: '600',
-    marginTop: '4px',
-  },
   buttonText: {
-    fontSize: '13px',
-    fontWeight: '400',
+    fontSize: '16px',
+    fontWeight: '500',
     textAlign: 'center',
     lineHeight: '1.4',
-    marginTop: '4px',
+    marginTop: '8px',
   },
   buttonYes: {
     backgroundColor: '#48bb78',
@@ -531,6 +636,36 @@ const styles = {
     padding: '12px 24px',
     minHeight: 'auto',
     maxWidth: '240px',
+  },
+  commentContainer: {
+    marginTop: '24px',
+    marginBottom: '8px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  commentLink: {
+    backgroundColor: 'transparent',
+    color: '#718096',
+    border: 'none',
+    padding: '8px',
+    fontSize: '14px',
+    cursor: 'pointer',
+    textDecoration: 'underline',
+  },
+  commentSection: {
+    width: '100%',
+    maxWidth: '700px',
+  },
+  commentTextarea: {
+    width: '100%',
+    padding: '12px',
+    fontSize: '14px',
+    border: '1px solid #cbd5e0',
+    borderRadius: '6px',
+    fontFamily: 'inherit',
+    resize: 'vertical',
+    lineHeight: '1.5',
   },
   progress: {
     marginTop: '24px',
