@@ -26,7 +26,7 @@ export async function POST(req) {
       return Response.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const { repoUrl, comparisonIndex, depA, depB, multiplier, userAgrees, wasSkipped } = await req.json()
+    const { repoUrl, comparisonIndex, depA, depB, multiplier, userAgrees, wasSkipped, comment } = await req.json()
 
     // Validate required fields - allow skip without userAgrees
     if (!repoUrl || comparisonIndex === undefined) {
@@ -50,6 +50,7 @@ export async function POST(req) {
       multiplier: multiplier || null,
       userAgrees: userAgrees !== undefined ? userAgrees : null,
       wasSkipped: wasSkipped || false,
+      comment: comment || null,
       timestamp: new Date().toISOString()
     }
 
@@ -111,7 +112,8 @@ export async function POST(req) {
         depB,
         multiplier,
         userAgrees,
-        wasSkipped
+        wasSkipped,
+        comment
       })
       console.log(`Level 3 comparison submitted to Google Sheets by ${session.user.ensName}`)
     } catch (sheetsError) {

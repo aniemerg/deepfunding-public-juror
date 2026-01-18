@@ -7,6 +7,38 @@
  */
 
 /**
+ * Standard multiplier values for rounding
+ */
+const STANDARD_MULTIPLIERS = [
+  1, 1.1, 1.2, 1.3, 1.5, 1.7, 2, 2.5, 3, 4, 5, 6, 7, 8, 10, 15, 20, 30, 50, 70, 100,
+  150, 200, 300, 500, 700, 1000, 1500, 2000, 3000, 5000, 7000, 10000
+]
+
+/**
+ * Round a multiplier to the nearest standard value in log space
+ * This ensures even spacing on a logarithmic scale
+ * @param {number} value - The raw multiplier value
+ * @returns {number} The nearest standard multiplier
+ */
+function roundToNearestMultiplierLogSpace(value) {
+  if (value <= 0) return STANDARD_MULTIPLIERS[0]
+
+  const logValue = Math.log(value)
+  let closestMultiplier = STANDARD_MULTIPLIERS[0]
+  let minDiff = Math.abs(Math.log(STANDARD_MULTIPLIERS[0]) - logValue)
+
+  for (const multiplier of STANDARD_MULTIPLIERS) {
+    const diff = Math.abs(Math.log(multiplier) - logValue)
+    if (diff < minDiff) {
+      minDiff = diff
+      closestMultiplier = multiplier
+    }
+  }
+
+  return closestMultiplier
+}
+
+/**
  * Weighted random selection from an array
  * @param {Array<{weight: number}>} items - Items with weights
  * @param {Array<number>} weights - Optional pre-computed weights array
@@ -119,19 +151,19 @@ export function generateComparisons(dependencies, targetCount = 10, existingComp
     const multiplier = depA.weight / depB.weight
 
     // Determine which dependency should be A (higher weight) and B (lower weight)
-    // For consistent question format: "Is A X× more valuable than B?"
+    // For consistent statement format: "A is X× more valuable than B"
     if (multiplier >= 1) {
       comparisons.push({
         depA: depA.url,
         depB: depB.url,
-        multiplier: Math.round(multiplier * 10) / 10 // Round to 1 decimal
+        multiplier: roundToNearestMultiplierLogSpace(multiplier)
       })
     } else {
       // Flip if B is actually heavier
       comparisons.push({
         depA: depB.url,
         depB: depA.url,
-        multiplier: Math.round((1 / multiplier) * 10) / 10
+        multiplier: roundToNearestMultiplierLogSpace(1 / multiplier)
       })
     }
   }

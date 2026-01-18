@@ -18,6 +18,7 @@ function EvaluatePageContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isNavigating, setIsNavigating] = useState(false)
 
   // Redirect if not logged in
   useEffect(() => {
@@ -129,6 +130,7 @@ function EvaluatePageContent() {
 
   async function handleSubmitComparison(comparisonData) {
     setIsSubmitting(true)
+    setIsNavigating(true)
 
     try {
       const response = await fetch('/api/level3/submit-comparison', {
@@ -174,10 +176,12 @@ function EvaluatePageContent() {
       alert(`Error: ${err.message}`)
     } finally {
       setIsSubmitting(false)
+      setIsNavigating(false)
     }
   }
 
   async function handleNavigateToComparison(screenId) {
+    setIsNavigating(true)
     try {
       // Navigate via API
       const response = await fetch('/api/level3/navigation-state', {
@@ -213,6 +217,8 @@ function EvaluatePageContent() {
     } catch (err) {
       console.error('Error navigating:', err)
       alert(`Error: ${err.message}`)
+    } finally {
+      setIsNavigating(false)
     }
   }
 
@@ -354,6 +360,13 @@ function EvaluatePageContent() {
         </div>
       </div>
 
+      {/* Non-intrusive spinner overlay */}
+      {isNavigating && (
+        <div className="refresh-overlay">
+          <div className="refresh-spinner"></div>
+        </div>
+      )}
+
       {/* Version */}
       <div style={styles.versionInfo}>
         v{process.env.NEXT_PUBLIC_GIT_COMMIT?.slice(0, 7) || 'dev'}
@@ -368,6 +381,40 @@ function EvaluatePageContent() {
           cursor: pointer;
           padding: 8px;
           color: #333;
+        }
+
+        .refresh-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(255, 255, 255, 0.3);
+          backdrop-filter: blur(2px);
+          z-index: 999;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          animation: fadeIn 150ms ease-in 150ms both;
+        }
+
+        .refresh-spinner {
+          width: 35px;
+          height: 35px;
+          border: 3px solid #f3f3f3;
+          border-top: 3px solid #3498db;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
 
         @media (max-width: 768px) {

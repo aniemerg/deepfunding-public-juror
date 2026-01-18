@@ -9430,7 +9430,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Ethereum SSZ (Simple Serialize) encoding library providing serialization primitives and BLS signature helpers for MEV-Boost Relay. Pervasive across runtime for encoding blocks, payloads, validator messages, plus signature verification and domain computation. Essential for Ethereum consensus spec compliance\u2014no alternatives for SSZ encoding standard. Critical infrastructure for relay operation; without it, cannot communicate with Ethereum consensus layer."
         },
         "https://github.com/attestantio/go-eth2-client": {
           "weight": 0.05836289,
@@ -12483,7 +12484,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Concurrent hashmap for Rust providing lock-free per-address nonce caching in Alloy's Ethereum transaction provider. Stores next nonce per address to minimize RPC calls during transaction submission. Focused on nonce management optimization\u2014isolated from core blockchain interaction. Many alternatives exist (std HashMap with Mutex, parking_lot, evmap); moderate switching cost due to concurrent access requirements."
         },
         "https://github.com/rust-fuzz/arbitrary": {
           "weight": 0.00123715,
@@ -22843,7 +22845,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Ethereum bytecode analyzer detecting proxy contracts for Sourcify's smart contract verification. Identifies EIP-1167 minimal proxies, Diamond proxies, and resolves implementation addresses from deployed bytecode. Focused on proxy detection feature\u2014important for complete verification but not core source matching. Few alternatives for automated proxy detection; custom implementations exist but moderate switching cost."
         },
         "https://github.com/piscinajs/piscina": {
           "weight": 0.00185776,
@@ -23307,7 +23310,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "YAML parser loading OpenAPI specifications at Sourcify server startup. Parses YAML files into JavaScript objects for API route configuration and documentation setup. Focused on server initialization\u2014not runtime contract verification logic. Many alternatives exist (js-yaml, yaml npm package); easy to replace with minimal refactoring. Development convenience for API documentation."
         },
         "https://github.com/typestrong/ts-node": {
           "weight": 0.00108872,
@@ -36013,7 +36017,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Python package publishing tool uploading Certora Prover releases to PyPI. Used exclusively in build/deployment scripts\u2014not runtime or testing. Single-purpose artifact publishing utility. Standard tool for PyPI uploads; alternatives exist (flit, poetry publish) but Twine is de facto standard. Build-time convenience; no impact on verification functionality."
         },
         "https://github.com/jedisct1/rust-siphash": {
           "weight": 0.00014285,
@@ -37885,7 +37890,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Test assertion framework for BLS library's JavaScript/TypeScript unit tests. Provides expect(...).to...() fluent assertion API across test suites. Development-time only\u2014no runtime cryptographic impact. Many alternatives exist (Jest matchers, node:assert, should.js); easy to replace but widely adopted standard. Test convenience tool."
         },
         "https://github.com/webpack/webpack-cli": {
           "weight": 0.00126277,
@@ -48456,7 +48462,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Snappy compression library for Teku Ethereum client compressing SSZ consensus data. Reduces storage and network bandwidth for BeaconState and validator data. Pervasive across consensus layer\u2014important for performance but not required for correctness. Few alternatives implementing Snappy format; moderate switching cost due to Ethereum wire protocol compatibility."
         },
         "https://github.com/remkop/picocli": {
           "weight": 0.00120404,
@@ -54019,7 +54026,8 @@
           "metadata": {
             "usage_report_date": "2025-12-11",
             "usage_report_available": true
-          }
+          },
+          "summary": "Transitive dependency with no usage in Aderyn source code. Appears only in dependency manifests but not imported or referenced. Could be removed by updating parent dependencies. Zero value to Aderyn\u2014unused transitive inclusion."
         },
         "https://github.com/bkchr/impl-trait-for-tuples": {
           "weight": 1.628e-05,
@@ -58313,7 +58321,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Hardhat development environment providing test runtime and Ethereum network simulation for solidity-lib. Pervasive across test infrastructure\u2014exposes Hardhat Runtime Environment (HRE), deploys contracts, manages accounts. Critical for testing but not production deployment. Few alternatives for Solidity testing (Foundry, Truffle); moderate switching cost due to deep test integration."
         },
         "https://github.com/paulmillr/noble-curves": {
           "weight": 0.02376837,
@@ -64421,7 +64430,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Transitive dependency with no usage in Erigon source code. Not imported or referenced directly. Could be removed by pruning dependency tree. Zero value to Erigon\u2014unused transitive inclusion."
         },
         "https://github.com/erigontech/erigon-db": {
           "weight": 0.00816519,
@@ -65433,7 +65443,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Generic collection utilities for Go providing safe lazy-initialized maps in Erigon. Used pervasively across runtime for map initialization helpers and type-safe generics. Convenience library for common patterns\u2014important for code quality but easy to inline. Many alternatives (manual implementations, other generic libs); low switching cost."
         },
         "https://github.com/prysmaticlabs/go-bitfield": {
           "weight": 0.00154542,
@@ -65620,7 +65631,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Snappy compression for Erigon's Ethereum beacon state SSZ encoding. Compresses BeaconState and consensus data for disk storage and network transmission. Pervasive across beacon chain sync\u2014important for performance and bandwidth. Standard for Ethereum SSZ compression; few alternatives due to protocol compatibility requirements."
         },
         "https://github.com/spf13/afero": {
           "weight": 0.00119637,
@@ -82230,7 +82242,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "AWS SDK providing Route53 DNS integration for go-ethereum's DNS-based node discovery (enrtree). Updates DNS TXT records for Ethereum node discovery mechanism. Focused on optional DNS discovery feature\u2014isolated from core consensus. Many cloud provider alternatives (Cloudflare, GCP); easy to replace or disable entirely."
         },
         "https://github.com/cpuguy83/go-md2man": {
           "weight": 6.46e-06,
@@ -90520,7 +90533,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "BLS12-381 cryptographic library providing signing and key derivation for Ethereum validator deposit CLI. Pervasive across keystore generation, deposit data creation, and credential management. Essential for Ethereum staking spec compliance\u2014generates deposit proofs validators need. Few alternatives for BLS12-381; critical infrastructure without alternatives."
         },
         "https://github.com/legrandin/pycryptodome": {
           "weight": 0.22342823,
@@ -129621,7 +129635,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Go-Ethereum P2P discovery components providing UDPv5 node discovery for Lambda Ethereum consensus client. Supplies enode, ENR, and discovery protocols for peer-to-peer networking. Pervasive across networking layer\u2014critical for node connectivity. One of few production-quality implementations; high switching cost due to Ethereum protocol compatibility."
         },
         "https://github.com/rusterlium/rustler": {
           "weight": 0.07663327,
@@ -130665,7 +130680,8 @@
           "metadata": {
             "usage_report_date": "2025-12-11",
             "usage_report_available": true
-          }
+          },
+          "summary": "Transitive dependency with no usage in Lambda Ethereum consensus source code. Not imported or referenced directly. Could be removed by dependency pruning. Zero value\u2014unused transitive inclusion."
         },
         "https://github.com/rust-lang/cc-rs": {
           "weight": 7.764e-05,
@@ -137275,7 +137291,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Transitive dependency with no usage in Juno source code. Not imported or referenced directly. Could be removed by updating parent dependencies. Zero value\u2014unused transitive inclusion."
         },
         "https://github.com/mitchellh/mapstructure": {
           "weight": 0.00477055,
@@ -146286,7 +146303,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "ZIP extraction utility for Hardhat's Windows solc compiler downloads. Extracts Solidity compiler binaries from ZIP archives on Windows systems. Single-purpose platform-specific utility\u2014isolated to compiler installation. Many alternatives exist (built-in unzip, extract-zip, decompress); easy to replace. Development-time convenience for Windows users."
         },
         "https://github.com/vitejs/vite-plugin-react": {
           "weight": 5.42e-05,
@@ -163869,7 +163887,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Concurrent hashmap providing thread-safe in-memory caching for Reth Ethereum client. Used pervasively as storage primitive across runtime components for concurrent data access. Important for performance in multi-threaded execution\u2014critical for throughput. Several alternatives exist (parking_lot RwLock, std Mutex); moderate switching cost due to performance characteristics."
         },
         "https://github.com/bheisler/criterion.rs": {
           "weight": 0.0084052,
@@ -174190,7 +174209,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Terminal emulator library rendering interactive command-line interface in Remix IDE browser. Provides Terminal class with addons for syntax highlighting, search, and clipboard. Pervasive across IDE\u2014essential for user interaction with compiler and debugger. Few browser-based terminal alternatives; moderate switching cost due to UI integration depth."
         },
         "https://github.com/graphql/graphql-js": {
           "weight": 0.01166506,
@@ -196271,7 +196291,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "BN254 elliptic curve arithmetic library for OP-Succinct's zkVM precompiles. Provides pairing operations (add, mul, pair) for zero-knowledge proof verification. Pervasive across cryptographic precompiles\u2014essential for ZK proof compatibility. Few alternatives for BN254 curve; moderate switching cost due to cryptographic correctness requirements."
         },
         "https://github.com/tokio-rs/tokio": {
           "weight": 0.00962375,
@@ -220502,7 +220523,8 @@
           "metadata": {
             "usage_report_date": "2025-12-10",
             "usage_report_available": true
-          }
+          },
+          "summary": "Read the Docs theme providing CSS styling for Titanoboa's Sphinx documentation site. Focused on documentation presentation\u2014no impact on runtime functionality. Many documentation theme alternatives exist (Furo, Book, alabaster); easy to replace. Pure aesthetic choice for developer documentation."
         }
       }
     },
