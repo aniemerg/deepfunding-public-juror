@@ -153,6 +153,11 @@ export default function EvaluationPage() {
 
 
 
+  // Check if background screen is completed
+  const isBackgroundCompleted = navigationState?.navigationItems?.some(
+    item => item.screenType === 'background' && (item.status === 'completed' || item.status === 'skipped')
+  ) || false
+
   const renderCurrentScreen = () => {
     const currentNavItem = navigationState.navigationItems.find(item => item.id === navigationState.currentScreen)
     if (!currentNavItem) {
@@ -295,7 +300,7 @@ export default function EvaluationPage() {
           onNavigate={handleNavigateToScreen}
           isMobileMenuOpen={isMobileMenuOpen}
           onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
-          showLevel3Link={level3Enabled}
+          showLevel3Link={level3Enabled && isBackgroundCompleted}
         />
 
         <div style={styles.mainContent}>
