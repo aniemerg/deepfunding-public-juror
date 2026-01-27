@@ -10,6 +10,8 @@ export default function Level3Page() {
   const [searchQuery, setSearchQuery] = useState('')
   const [featureEnabled, setFeatureEnabled] = useState(null)
   const [checkingFeature, setCheckingFeature] = useState(true)
+  const [mode, setMode] = useState('overview') // 'overview' or 'comparisons'
+  const [loadingMode, setLoadingMode] = useState(true)
 
   // Check feature flag on mount
   useEffect(() => {
@@ -28,6 +30,31 @@ export default function Level3Page() {
     checkFeatureFlag()
   }, [])
 
+  // Load mode preference from KV
+  useEffect(() => {
+    if (!isLoggedIn || !user?.address) {
+      setLoadingMode(false)
+      return
+    }
+
+    async function loadModePreference() {
+      try {
+        const response = await fetch('/api/level3/mode-preference')
+        if (response.ok) {
+          const data = await response.json()
+          if (data.mode) {
+            setMode(data.mode)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load mode preference:', error)
+      } finally {
+        setLoadingMode(false)
+      }
+    }
+    loadModePreference()
+  }, [isLoggedIn, user?.address])
+
   // Redirect if not logged in
   useEffect(() => {
     if (!isLoading && !isLoggedIn) {
@@ -45,13 +72,31 @@ export default function Level3Page() {
     router.push('/')
   }
 
+  const handleModeChange = async (newMode) => {
+    setMode(newMode)
+
+    // Save preference to KV
+    try {
+      await fetch('/api/level3/mode-preference', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: newMode })
+      })
+    } catch (error) {
+      console.error('Failed to save mode preference:', error)
+    }
+  }
+
   const handleSelectRepo = (repo) => {
-    // Navigate to evaluation page with repo URL as query param
-    router.push(`/level3/evaluate?repo=${encodeURIComponent(repo.url)}`)
+    // Navigate based on selected mode
+    const route = mode === 'overview'
+      ? `/level3/overview?repo=${encodeURIComponent(repo.url)}`
+      : `/level3/evaluate?repo=${encodeURIComponent(repo.url)}`
+    router.push(route)
   }
 
   // Loading states
-  if (isLoading || checkingFeature) {
+  if (isLoading || checkingFeature || loadingMode) {
     return (
       <div style={styles.container}>
         <div style={styles.loading}>Loading...</div>
@@ -94,12 +139,40 @@ export default function Level3Page() {
         <div style={styles.intro}>
           <h2 style={styles.pageTitle}>Level 3: Dependency Evaluation</h2>
           <p style={styles.description}>
-            Select a repository to evaluate its dependencies. You will compare the relative
-            value that each dependency provides to the parent project.
+            Select a repository to evaluate its dependencies. Choose your evaluation mode below.
           </p>
           <button onClick={() => router.push('/evaluation')} style={styles.level2Link}>
             ← Back to Level 2
           </button>
+        </div>
+
+        <div style={styles.modeSelector}>
+          <button
+            onClick={() => handleModeChange('overview')}
+            style={mode === 'overview' ? styles.modeButtonActive : styles.modeButton}
+          >
+            📊 Overview Mode (Recommended)
+          </button>
+          <button
+            onClick={() => handleModeChange('comparisons')}
+            style={mode === 'comparisons' ? styles.modeButtonActive : styles.modeButton}
+          >
+            ⚖️ Comparisons Mode
+          </button>
+        </div>
+
+        <div style={styles.modeDescription}>
+          {mode === 'overview' ? (
+            <p style={styles.modeDescriptionText}>
+              <strong>Overview Mode:</strong> View and adjust weights for all dependencies in a single screen.
+              Edit individual weights directly and see the full picture at once.
+            </p>
+          ) : (
+            <p style={styles.modeDescriptionText}>
+              <strong>Comparisons Mode:</strong> Make pairwise comparisons between dependencies.
+              Evaluate relative value through a series of focused comparison screens.
+            </p>
+          )}
         </div>
 
         <div style={styles.searchSection}>
@@ -216,6 +289,52 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '14px',
+  },
+  modeSelector: {
+    display: 'flex',
+    gap: '12px',
+    marginBottom: '16px',
+    flexWrap: 'wrap',
+  },
+  modeButton: {
+    flex: 1,
+    minWidth: '200px',
+    padding: '16px 20px',
+    backgroundColor: 'white',
+    color: '#4a5568',
+    border: '2px solid #e2e8f0',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '16px',
+    fontWeight: '500',
+    transition: 'all 0.2s ease',
+  },
+  modeButtonActive: {
+    flex: 1,
+    minWidth: '200px',
+    padding: '16px 20px',
+    backgroundColor: '#3182ce',
+    color: 'white',
+    border: '2px solid #3182ce',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '16px',
+    fontWeight: '600',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 2px 8px rgba(49, 130, 206, 0.3)',
+  },
+  modeDescription: {
+    marginBottom: '24px',
+    padding: '12px 16px',
+    backgroundColor: '#edf2f7',
+    borderRadius: '6px',
+    borderLeft: '4px solid #3182ce',
+  },
+  modeDescriptionText: {
+    margin: 0,
+    fontSize: '14px',
+    color: '#2d3748',
+    lineHeight: '1.5',
   },
   searchSection: {
     marginBottom: '20px',

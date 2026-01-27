@@ -302,22 +302,70 @@ export async function submitRepoSelectionData(env, { ensName, initialRepos, veto
   return await appendToSheet(env, accessToken, sheetName, values);
 }
 
-// Generic append function
+// Submit Level 3 Overview data (one row per dependency)
+export async function submitLevel3OverviewData(env, { ensName, repoUrl, dependencies, adjustedWeights, comment }) {
+  const accessToken = await getAccessToken(env);
+  const sheetName = "Level3Overview";
+  const submissionId = generateSubmissionId(); // Same ID for all rows in this submission
+  const timestamp = new Date().toISOString();
+
+  // Create one row per dependency
+  const rows = dependencies.map((dep, index) => {
+    const aiWeight = dep.aiWeight;
+    const userWeight = adjustedWeights[dep.url] || 0;
+
+    return [
+      submissionId,
+      1, // version
+      ensName,
+      timestamp,
+      repoUrl,
+      dep.url,
+      aiWeight.toString(),
+      userWeight.toString(),
+      index === 0 ? (comment || '') : '' // Only include comment in first row
+    ];
+  });
+
+  // Append all rows at once
+  return await appendMultipleRows(env, accessToken, sheetName, rows);
+}
+
+// Generic append function (single row)
 async function appendToSheet(env, accessToken, sheetName, values) {
   const sheetId = getSheetId(env);
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}!A:A:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
-  
+
   const res = await fetch(url, {
     method: "POST",
     headers: { "authorization": `Bearer ${accessToken}`, "content-type": "application/json" },
     body: JSON.stringify({ values: [values] }),
   });
-  
+
   if (!res.ok) {
     const errorText = await res.text();
     throw new Error(`Sheets append failed: ${res.status} ${errorText}`);
   }
-  
+
+  return await res.json();
+}
+
+// Generic append function (multiple rows)
+async function appendMultipleRows(env, accessToken, sheetName, rows) {
+  const sheetId = getSheetId(env);
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}!A:A:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "authorization": `Bearer ${accessToken}`, "content-type": "application/json" },
+    body: JSON.stringify({ values: rows }),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Sheets append failed: ${res.status} ${errorText}`);
+  }
+
   return await res.json();
 }
 
