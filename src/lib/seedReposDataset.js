@@ -6,6 +6,7 @@
  */
 
 import seedReposData from '../data/seedReposWithDependenciesAndWeights.json'
+import { PROJECT_SUMMARIES } from './projectSummariesDataset'
 
 /**
  * Get all seed repository URLs
@@ -79,4 +80,14 @@ export function searchSeedRepos(query) {
     repo.name.toLowerCase().includes(lowerQuery) ||
     repo.owner.toLowerCase().includes(lowerQuery)
   )
+}
+
+/**
+ * Get repository summary from project summaries dataset
+ * @param {string} repoUrl - The repository URL (e.g., "https://github.com/ethereum/go-ethereum")
+ * @returns {Object|null} Summary object with description/summary or null if not found
+ */
+export function getRepositorySummary(repoUrl) {
+  const fullName = repoUrl.replace('https://github.com/', '')
+  return PROJECT_SUMMARIES[fullName] || null
 }
