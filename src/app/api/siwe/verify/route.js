@@ -10,32 +10,50 @@ import { getCloudflareContext } from "@opennextjs/cloudflare"
 import { createPublicClient, http } from 'viem'
 import { mainnet, base } from 'viem/chains'
 
-// ENS Resolution function - uses viem to query blockchain directly (no caching)
+// ENS Resolution function with fallback RPC endpoints and timeout
 async function resolveENSName(address) {
-  try {
-    console.log('Backend: Resolving ENS for address:', address);
+  // Try multiple RPC endpoints with timeout
+  const rpcEndpoints = [
+    process.env.INFURA_API_KEY
+      ? `https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`
+      : null,
+    'https://cloudflare-eth.com',
+    'https://eth.llamarpc.com',
+    'https://rpc.ankr.com/eth',
+    'https://eth.drpc.org'
+  ].filter(Boolean) // Remove null entries if no Infura key
 
-    // Use viem to get ENS name directly from blockchain
-    const client = createPublicClient({
-      chain: mainnet,
-      transport: http()
-    })
+  for (const rpcUrl of rpcEndpoints) {
+    try {
+      console.log(`Backend: Trying ENS resolution for ${address} via ${rpcUrl}`);
 
-    const ensName = await client.getEnsName({
-      address: address
-    })
+      const client = createPublicClient({
+        chain: mainnet,
+        transport: http(rpcUrl, {
+          timeout: 10000 // 10 second timeout per attempt
+        })
+      })
 
-    if (ensName && ensName.endsWith('.eth')) {
-      console.log('Backend: Found ENS via viem:', ensName);
-      return ensName;
+      const ensName = await client.getEnsName({
+        address: address
+      })
+
+      if (ensName && ensName.endsWith('.eth')) {
+        console.log(`Backend: Found ENS via ${rpcUrl}:`, ensName);
+        return ensName;
+      }
+
+      console.log(`Backend: No ENS found for address via ${rpcUrl}`);
+      return null;
+    } catch (error) {
+      console.error(`Backend: ENS resolution failed with ${rpcUrl}:`, error.message);
+      // Try next endpoint
+      continue;
     }
-
-    console.log('Backend: No ENS found for address:', address);
-    return null;
-  } catch (error) {
-    console.error('Backend: ENS resolution failed:', error);
-    return null;
   }
+
+  console.error('Backend: All ENS resolution attempts failed');
+  return null;
 }
 
 export async function POST(req) {
