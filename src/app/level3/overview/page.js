@@ -34,7 +34,14 @@ function OverviewPageContent() {
     return null
   }
 
-  return <OverviewScreenLevel3 repoUrl={repoUrl} user={user} />
+  return (
+    <OverviewScreenLevel3
+      repoUrl={repoUrl}
+      userAddress={user?.address}
+      ensName={user?.ensName}
+      onBackToList={() => router.push('/level3')}
+    />
+  )
 }
 
 export default function OverviewPage() {
