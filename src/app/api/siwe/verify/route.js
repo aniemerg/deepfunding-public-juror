@@ -152,7 +152,34 @@ export async function POST(req) {
     }
 
     // Resolve ENS name - REQUIRED for login
-    const ensName = await resolveENSName(siwe.address);
+    // Check cache first to speed up returning users
+    let ensName = null;
+    try {
+      const env = getCloudflareContext().env;
+      const profileKey = `user:${siwe.address.toLowerCase()}:profile`;
+      const cachedProfile = await env.JURY_DATA.get(profileKey);
+
+      if (cachedProfile) {
+        const profile = JSON.parse(cachedProfile);
+        const cacheAge = Date.now() - new Date(profile.lastLogin).getTime();
+        const cacheTTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+        if (cacheAge < cacheTTL && profile.ensName) {
+          ensName = profile.ensName;
+          console.log('Backend: Using cached ENS name:', ensName);
+        } else {
+          console.log('Backend: Cached ENS expired, will lookup fresh');
+        }
+      }
+    } catch (cacheError) {
+      console.log('Backend: Cache lookup failed, will do full ENS resolution:', cacheError.message);
+    }
+
+    // If not cached, do full ENS resolution
+    if (!ensName) {
+      ensName = await resolveENSName(siwe.address);
+    }
+
     if (!ensName) {
       return NextResponse.json({
         error: 'Primary ENS Name Required',
@@ -180,18 +207,30 @@ export async function POST(req) {
     session.siweNonce = null
     await session.save()
 
-    // Store ENS name in KV for easy access (e.g., by kv-manager tool)
+    // Store/update ENS name in KV for caching and easy access
     try {
       const env = getCloudflareContext().env;
       const profileKey = `user:${siwe.address.toLowerCase()}:profile`;
       const ensLookupKey = `ens:${ensName}`;
 
-      // Store user profile (address → profile data)
+      // Check if profile exists to preserve firstLogin
+      let firstLogin = new Date().toISOString();
+      try {
+        const existing = await env.JURY_DATA.get(profileKey);
+        if (existing) {
+          const existingProfile = JSON.parse(existing);
+          firstLogin = existingProfile.firstLogin || firstLogin;
+        }
+      } catch (e) {
+        // New user, use current timestamp
+      }
+
+      // Store/update user profile (address → profile data)
       await env.JURY_DATA.put(profileKey, JSON.stringify({
         ensName: ensName,
         address: siwe.address.toLowerCase(),
         chainId: siwe.chainId,
-        firstLogin: new Date().toISOString(),
+        firstLogin: firstLogin,
         lastLogin: new Date().toISOString()
       }));
 
