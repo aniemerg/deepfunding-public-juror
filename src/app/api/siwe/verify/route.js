@@ -15,15 +15,20 @@ async function getOwnedEnsNames(address) {
   const ENS_SUBGRAPH_URL = 'https://api.thegraph.com/subgraphs/name/ensdomains/ens'
 
   const query = `
-    query GetRegistrations($owner: String!) {
-      registrations(
-        where: { registrant: $owner }
-        first: 100
-        orderBy: registrationDate
-        orderDirection: desc
-      ) {
+    query GetOwnedNames($owner: String!) {
+      account(id: $owner) {
+        registrations {
+          labelName
+          expiryDate
+        }
+        wrappedDomains {
+          name
+          expiryDate
+        }
+      }
+      domains(where: { owner: $owner }) {
+        name
         labelName
-        expiryDate
       }
     }
   `
@@ -50,16 +55,46 @@ async function getOwnedEnsNames(address) {
       return []
     }
 
-    if (!data.data?.registrations) {
-      return []
+    const now = Math.floor(Date.now() / 1000)
+    const namesSet = new Set()
+
+    // Collect from registrations (traditional ERC-721)
+    if (data.data?.account?.registrations) {
+      data.data.account.registrations
+        .filter(reg => parseInt(reg.expiryDate) > now)
+        .forEach(reg => namesSet.add(`${reg.labelName}.eth`))
     }
 
-    // Filter out expired names and add .eth suffix
-    const now = Math.floor(Date.now() / 1000)
-    const activeNames = data.data.registrations
-      .filter(reg => parseInt(reg.expiryDate) > now)
-      .map(reg => `${reg.labelName}.eth`)
+    // Collect from wrapped domains (ERC-1155)
+    if (data.data?.account?.wrappedDomains) {
+      data.data.account.wrappedDomains
+        .filter(domain => {
+          // Check expiry if available
+          if (domain.expiryDate) {
+            return parseInt(domain.expiryDate) > now
+          }
+          return true // Include if no expiry data
+        })
+        .forEach(domain => {
+          // domain.name is already the full name (e.g., "vitalik.eth")
+          if (domain.name && domain.name.endsWith('.eth')) {
+            namesSet.add(domain.name)
+          }
+        })
+    }
 
+    // Collect from domains (owner field)
+    if (data.data?.domains) {
+      data.data.domains.forEach(domain => {
+        if (domain.name && domain.name.endsWith('.eth')) {
+          namesSet.add(domain.name)
+        } else if (domain.labelName) {
+          namesSet.add(`${domain.labelName}.eth`)
+        }
+      })
+    }
+
+    const activeNames = Array.from(namesSet).sort()
     console.log(`Found ${activeNames.length} active ENS names for ${address}:`, activeNames)
     return activeNames
 
