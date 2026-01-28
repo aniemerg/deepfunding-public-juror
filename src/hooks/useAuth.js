@@ -48,7 +48,7 @@ export function useAuth() {
     }
   }
 
-  const login = async (inviteCode) => {
+  const login = async (inviteCode, selectedEnsName) => {
     if (!isConnected || !address || !chainId) {
       throw new Error('Wallet not connected')
     }
@@ -56,7 +56,7 @@ export function useAuth() {
     try {
       // Get nonce
       const nonce = await (await fetch('/api/siwe/nonce', { credentials: 'include' })).text()
-      
+
       // Create SIWE message
       const message = createSiweMessage({
         address,
@@ -71,12 +71,17 @@ export function useAuth() {
       // Sign message
       const signature = await signMessageAsync({ message })
 
-      // Verify with backend
+      // Verify with backend (include selectedEnsName if user owns multiple ENS)
       const response = await fetch('/api/siwe/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ message, signature, inviteCode }),
+        body: JSON.stringify({
+          message,
+          signature,
+          inviteCode,
+          selectedEnsName
+        }),
       })
 
       const data = await response.json()

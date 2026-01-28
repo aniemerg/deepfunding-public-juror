@@ -12,6 +12,9 @@ export default function LoginPage() {
   const [isLogging, setIsLogging] = useState(false)
   const [ensData, setEnsData] = useState(null)
   const [checkingEns, setCheckingEns] = useState(false)
+  const [ownedEnsNames, setOwnedEnsNames] = useState([])
+  const [selectedEns, setSelectedEns] = useState(null)
+  const [needsSelection, setNeedsSelection] = useState(false)
   const { login, isLoggedIn } = useAuth()
   const { address, isConnected } = useAccount()
   const router = useRouter()
@@ -35,26 +38,52 @@ export default function LoginPage() {
   const checkENSName = async (walletAddress) => {
     setCheckingEns(true)
     setError('')
+    setNeedsSelection(false)
 
     try {
-      const response = await fetch(`/api/resolve-ens?address=${walletAddress}`)
-      const data = await response.json()
+      // STEP 1: Try reverse lookup first (fast path)
+      const reverseResponse = await fetch(`/api/resolve-ens?address=${walletAddress}`)
+      const reverseData = await reverseResponse.json()
 
-      if (data.success && data.name && data.name.endsWith('.eth')) {
+      if (reverseData.success && reverseData.name && reverseData.name.endsWith('.eth')) {
         setEnsData({
-          name: data.name,
-          avatar: data.avatar
+          name: reverseData.name,
+          avatar: reverseData.avatar
+        })
+        setSelectedEns(reverseData.name)
+        return
+      }
+
+      // STEP 2: Reverse lookup failed, check owned ENS NFTs
+      console.log('Reverse lookup failed, checking owned ENS names...')
+      const ownedResponse = await fetch(`/api/get-owned-ens?address=${walletAddress}`)
+      const ownedData = await ownedResponse.json()
+
+      if (!ownedData.success || ownedData.ownedNames.length === 0) {
+        setEnsData(null)
+        setError({
+          type: 'ens_required',
+          title: 'ENS Name Required',
+          message: 'You must own an ENS name ending in .eth to participate.',
+          helpUrl: 'https://ens.domains'
         })
         return
       }
 
-      setEnsData(null)
-      setError({
-        type: 'ens_required',
-        title: 'ENS Name Required',
-        message: 'To participate, your wallet needs a primary ENS name ending in .eth.',
-        helpUrl: 'https://support.ens.domains/en/articles/8684192-how-to-set-as-primary-name'
-      })
+      // User owns ENS name(s)
+      if (ownedData.ownedNames.length === 1) {
+        // Auto-select single ENS
+        const singleEns = ownedData.ownedNames[0]
+        setEnsData({ name: singleEns })
+        setSelectedEns(singleEns)
+        console.log('Auto-selected single ENS:', singleEns)
+        return
+      }
+
+      // Multiple ENS - show selection UI
+      setOwnedEnsNames(ownedData.ownedNames)
+      setNeedsSelection(true)
+      console.log('Multiple ENS found, needs selection:', ownedData.ownedNames)
 
     } catch (err) {
       console.error('ENS check failed:', err)
@@ -67,15 +96,27 @@ export default function LoginPage() {
     }
   }
 
+  const handleEnsSelection = (ensName) => {
+    setSelectedEns(ensName)
+    setEnsData({ name: ensName })
+    setNeedsSelection(false)
+    console.log('User selected ENS:', ensName)
+  }
+
   const handleLogin = async () => {
     setIsLogging(true)
     setError('')
     try {
-      await login(inviteCode || undefined)
+      await login(inviteCode || undefined, selectedEns || undefined)
       router.push('/evaluation')
     } catch (err) {
       if (err.response) {
         setError({ type: 'auth', ...err.response })
+        // If server says we need to select an ENS, show the selection UI
+        if (err.response.requiresSelection && err.response.ownedNames) {
+          setOwnedEnsNames(err.response.ownedNames)
+          setNeedsSelection(true)
+        }
       } else if (err.message) {
         setError({ type: 'auth', message: err.message })
       } else {
@@ -117,6 +158,35 @@ export default function LoginPage() {
                   avatar={ensData?.avatar}
                   isValid={!!ensData?.name}
                 />
+
+                {needsSelection && ownedEnsNames.length > 0 && (
+                  <div style={styles.ensSelectionContainer}>
+                    <div style={styles.selectionHeader}>
+                      <span style={styles.selectionIcon}>🔐</span>
+                      <div>
+                        <div style={styles.selectionTitle}>Select Your ENS Name</div>
+                        <div style={styles.selectionMessage}>
+                          You own multiple ENS names. Choose which one to use:
+                        </div>
+                      </div>
+                    </div>
+                    <div style={styles.ensNameList}>
+                      {ownedEnsNames.map(name => (
+                        <button
+                          key={name}
+                          onClick={() => handleEnsSelection(name)}
+                          style={{
+                            ...styles.ensNameButton,
+                            ...(selectedEns === name ? styles.ensNameButtonSelected : {})
+                          }}
+                        >
+                          {name}
+                          {selectedEns === name && <span style={styles.checkmark}>✓</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {error && error.type === 'ens_required' && (
                   <div style={styles.ensError}>
@@ -340,5 +410,62 @@ const styles = {
   signInButtonDisabled: {
     backgroundColor: '#9ca3af',
     cursor: 'not-allowed',
+  },
+  ensSelectionContainer: {
+    padding: '16px',
+    backgroundColor: '#f0f9ff',
+    border: '1px solid #bfdbfe',
+    borderRadius: '10px',
+  },
+  selectionHeader: {
+    display: 'flex',
+    gap: '12px',
+    alignItems: 'flex-start',
+    marginBottom: '14px',
+  },
+  selectionIcon: {
+    fontSize: '20px',
+    flexShrink: 0,
+    marginTop: '1px',
+  },
+  selectionTitle: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#1e40af',
+    marginBottom: '2px',
+  },
+  selectionMessage: {
+    fontSize: '13px',
+    color: '#3b82f6',
+    lineHeight: '1.4',
+  },
+  ensNameList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  ensNameButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '12px 14px',
+    backgroundColor: '#fff',
+    border: '2px solid #dbeafe',
+    borderRadius: '8px',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#1e40af',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    textAlign: 'left',
+  },
+  ensNameButtonSelected: {
+    backgroundColor: '#dbeafe',
+    borderColor: '#3b82f6',
+  },
+  checkmark: {
+    color: '#3b82f6',
+    fontSize: '16px',
+    fontWeight: '700',
   },
 }

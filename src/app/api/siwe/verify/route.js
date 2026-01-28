@@ -10,9 +10,68 @@ import { getCloudflareContext } from "@opennextjs/cloudflare"
 import { createPublicClient, http } from 'viem'
 import { mainnet, base } from 'viem/chains'
 
+// Query ENS names owned by an address using The Graph ENS subgraph
+async function getOwnedEnsNames(address) {
+  const ENS_SUBGRAPH_URL = 'https://api.thegraph.com/subgraphs/name/ensdomains/ens'
+
+  const query = `
+    query GetRegistrations($owner: String!) {
+      registrations(
+        where: { registrant: $owner }
+        first: 100
+        orderBy: registrationDate
+        orderDirection: desc
+      ) {
+        labelName
+        expiryDate
+      }
+    }
+  `
+
+  try {
+    const response = await fetch(ENS_SUBGRAPH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query,
+        variables: { owner: address.toLowerCase() }
+      })
+    })
+
+    if (!response.ok) {
+      console.error('ENS subgraph query failed:', response.status)
+      return []
+    }
+
+    const data = await response.json()
+
+    if (data.errors) {
+      console.error('ENS subgraph errors:', data.errors)
+      return []
+    }
+
+    if (!data.data?.registrations) {
+      return []
+    }
+
+    // Filter out expired names and add .eth suffix
+    const now = Math.floor(Date.now() / 1000)
+    const activeNames = data.data.registrations
+      .filter(reg => parseInt(reg.expiryDate) > now)
+      .map(reg => `${reg.labelName}.eth`)
+
+    console.log(`Found ${activeNames.length} active ENS names for ${address}:`, activeNames)
+    return activeNames
+
+  } catch (error) {
+    console.error('Error querying ENS subgraph:', error)
+    return []
+  }
+}
+
 // ENS Resolution function with fallback RPC endpoints and timeout
-async function resolveENSName(address) {
-  // Try multiple RPC endpoints with timeout
+async function resolveENSName(address, selectedEnsName = null) {
+  // STEP 1: Try reverse lookup first (preferred - fast with caching)
   const rpcEndpoints = [
     process.env.INFURA_API_KEY
       ? `https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`
@@ -25,7 +84,7 @@ async function resolveENSName(address) {
 
   for (const rpcUrl of rpcEndpoints) {
     try {
-      console.log(`Backend: Trying ENS resolution for ${address} via ${rpcUrl}`);
+      console.log(`Backend: Trying ENS reverse lookup for ${address} via ${rpcUrl}`);
 
       const client = createPublicClient({
         chain: mainnet,
@@ -39,12 +98,12 @@ async function resolveENSName(address) {
       })
 
       if (ensName && ensName.endsWith('.eth')) {
-        console.log(`Backend: Found ENS via ${rpcUrl}:`, ensName);
-        return ensName;
+        console.log(`Backend: Found ENS via reverse lookup:`, ensName);
+        return { ensName, method: 'reverse', ownedNames: null }
       }
 
-      console.log(`Backend: No ENS found for address via ${rpcUrl}`);
-      return null;
+      console.log(`Backend: No reverse ENS found via ${rpcUrl}`);
+      break; // Exit loop on first successful connection (even if no name found)
     } catch (error) {
       console.error(`Backend: ENS resolution failed with ${rpcUrl}:`, error.message);
       // Try next endpoint
@@ -52,14 +111,36 @@ async function resolveENSName(address) {
     }
   }
 
-  console.error('Backend: All ENS resolution attempts failed');
-  return null;
+  // STEP 2: Reverse lookup failed, query owned ENS NFTs
+  console.log(`Backend: Reverse lookup failed, checking owned ENS names...`);
+  const ownedNames = await getOwnedEnsNames(address)
+
+  if (ownedNames.length === 0) {
+    console.log('Backend: No ENS names owned by this address');
+    return { ensName: null, method: 'none', ownedNames: [] }
+  }
+
+  // If user selected one from the list, validate and use it
+  if (selectedEnsName && ownedNames.includes(selectedEnsName)) {
+    console.log(`Backend: Using selected ENS name: ${selectedEnsName}`);
+    return { ensName: selectedEnsName, method: 'ownership', ownedNames }
+  }
+
+  // If only one ENS name owned, use it automatically
+  if (ownedNames.length === 1) {
+    console.log(`Backend: Auto-selecting single owned ENS: ${ownedNames[0]}`);
+    return { ensName: ownedNames[0], method: 'ownership', ownedNames }
+  }
+
+  // Multiple ENS names - need user to select
+  console.log(`Backend: User owns ${ownedNames.length} ENS names, selection required`);
+  return { ensName: null, method: 'multiple', ownedNames }
 }
 
 export async function POST(req) {
   const cookieStore = await cookies()
   const session = await getIronSession(cookieStore, sessionOptions)
-  const { message, signature, inviteCode } = await req.json()
+  const { message, signature, inviteCode, selectedEnsName } = await req.json()
 
   try {
     const siwe = new SiweMessage(message)
@@ -154,6 +235,8 @@ export async function POST(req) {
     // Resolve ENS name - REQUIRED for login
     // Check cache first to speed up returning users
     let ensName = null;
+    let ensResolutionResult = null;
+
     try {
       const env = getCloudflareContext().env;
       const profileKey = `user:${siwe.address.toLowerCase()}:profile`;
@@ -177,14 +260,36 @@ export async function POST(req) {
 
     // If not cached, do full ENS resolution
     if (!ensName) {
-      ensName = await resolveENSName(siwe.address);
+      ensResolutionResult = await resolveENSName(siwe.address, selectedEnsName || null);
+      ensName = ensResolutionResult.ensName;
     }
 
+    // Handle different resolution outcomes
     if (!ensName) {
+      if (ensResolutionResult?.method === 'none') {
+        return NextResponse.json({
+          error: 'ENS Name Required',
+          message: 'To participate, you must own an ENS name ending in .eth.',
+          helpUrl: 'https://ens.domains',
+          address: siwe.address
+        }, { status: 403 })
+      }
+
+      if (ensResolutionResult?.method === 'multiple') {
+        return NextResponse.json({
+          error: 'Multiple ENS Names Found',
+          message: 'You own multiple ENS names. Please select which one to use.',
+          ownedNames: ensResolutionResult.ownedNames,
+          requiresSelection: true,
+          address: siwe.address
+        }, { status: 409 }) // 409 Conflict - needs user selection
+      }
+
+      // Fallback error for any other case
       return NextResponse.json({
-        error: 'Primary ENS Name Required',
-        message: 'To participate, you must own an ENS name ending in .eth and set it as your Primary ENS Name for this wallet address.',
-        helpUrl: 'https://support.ens.domains/en/articles/8684192-how-to-set-as-primary-name',
+        error: 'ENS Name Required',
+        message: 'To participate, you must own an ENS name ending in .eth.',
+        helpUrl: 'https://ens.domains',
         address: siwe.address
       }, { status: 403 })
     }
