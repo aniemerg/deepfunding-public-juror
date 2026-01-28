@@ -7,7 +7,7 @@ import { submitLevel3OverviewData } from '@/lib/googleSheets'
 /**
  * Submit overview weights to Google Sheets
  * POST /api/level3/overview/submit
- * Body: { repoUrl, dependencies, adjustedWeights, comment }
+ * Body: { repoUrl, dependencies, adjustedWeights, depComments }
  */
 export async function POST(req) {
   try {
@@ -18,7 +18,7 @@ export async function POST(req) {
       return Response.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const { repoUrl, dependencies, adjustedWeights, comment } = await req.json()
+    const { repoUrl, dependencies, adjustedWeights, depComments } = await req.json()
 
     if (!repoUrl || !dependencies || !adjustedWeights) {
       return Response.json({ error: 'Missing required fields' }, { status: 400 })
@@ -32,7 +32,7 @@ export async function POST(req) {
     const data = {
       repoUrl,
       adjustedWeights,
-      comment: comment || '',
+      depComments: depComments || {},
       lastSaved: new Date().toISOString(),
       submitted: true,
       submittedAt: new Date().toISOString()
@@ -47,7 +47,7 @@ export async function POST(req) {
         repoUrl,
         dependencies,
         adjustedWeights,
-        comment: comment || ''
+        depComments: depComments || {}
       })
 
       console.log(`Level 3 overview submitted to Google Sheets by ${session.user.ensName}: ${repoUrl}`)

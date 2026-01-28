@@ -19,7 +19,8 @@ export default function OverviewScreenLevel3({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [comment, setComment] = useState('')
+  const [depComments, setDepComments] = useState({}) // Per-dependency comments (keyed by dep.url)
+  const [expandedComments, setExpandedComments] = useState(new Set()) // Which comment boxes are open
   const [lastSaved, setLastSaved] = useState(null)
 
   const parentName = repoUrl.replace('https://github.com/', '')
@@ -47,6 +48,10 @@ export default function OverviewScreenLevel3({
 
             if (data.editedFields) {
               setEditedFields(new Set(data.editedFields))
+            }
+
+            if (data.depComments) {
+              setDepComments(data.depComments)
             }
           } else {
             // Initialize with AI weights
@@ -109,7 +114,7 @@ export default function OverviewScreenLevel3({
     }, 1500)
 
     return () => clearTimeout(timeoutId)
-  }, [adjustedWeights, editedFields, loading])
+  }, [adjustedWeights, editedFields, depComments, loading])
 
   async function saveToKV() {
     if (Object.keys(adjustedWeights).length === 0) return
@@ -122,7 +127,8 @@ export default function OverviewScreenLevel3({
         body: JSON.stringify({
           repoUrl,
           adjustedWeights,
-          editedFields: Array.from(editedFields)
+          editedFields: Array.from(editedFields),
+          depComments
         })
       })
       setLastSaved(new Date())
@@ -270,6 +276,28 @@ export default function OverviewScreenLevel3({
     })
   }
 
+  // Toggle comment expansion
+  const toggleCommentExpansion = (depUrl) => {
+    setExpandedComments(prev => {
+      const next = new Set(prev)
+      if (next.has(depUrl)) {
+        next.delete(depUrl)
+      } else {
+        next.add(depUrl)
+      }
+      return next
+    })
+  }
+
+  // Handle comment change
+  const handleCommentChange = (depUrl, value) => {
+    setDepComments(prev => ({
+      ...prev,
+      [depUrl]: value
+    }))
+    // Auto-save will trigger automatically via useEffect
+  }
+
   // Sorting
   const sortedDependencies = useMemo(() => {
     if (dependencies.length === 0) return []
@@ -333,7 +361,7 @@ export default function OverviewScreenLevel3({
             aiWeight: d.weight
           })),
           adjustedWeights,
-          comment: comment.trim() || null
+          depComments
         })
       })
 
@@ -461,24 +489,14 @@ export default function OverviewScreenLevel3({
                 onInputChange={handleInputChange}
                 onInputComplete={handleInputComplete}
                 onToggleExpand={toggleRowExpansion}
+                depComment={depComments[dep.url]}
+                isCommentExpanded={expandedComments.has(dep.url)}
+                onToggleComment={toggleCommentExpansion}
+                onCommentChange={handleCommentChange}
               />
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* Comment Section */}
-      <div style={styles.commentSection}>
-        <label style={styles.commentLabel}>
-          Optional Comment (visible to research team):
-        </label>
-        <textarea
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          placeholder="Share any thoughts about this evaluation..."
-          style={styles.commentTextarea}
-          rows={3}
-        />
       </div>
 
       {/* Submit Section */}
@@ -511,7 +529,11 @@ function DependencyRow({
   isExpanded,
   onInputChange,
   onInputComplete,
-  onToggleExpand
+  onToggleExpand,
+  depComment,
+  isCommentExpanded,
+  onToggleComment,
+  onCommentChange
 }) {
   const depData = getDependency(repoUrl, dep.url)
   const summary = depData?.summary || 'No summary available'
@@ -560,12 +582,33 @@ function DependencyRow({
               {parseFloat(difference) > 0 ? '+' : ''}{difference}%
             </span>
           )}
+          <div style={styles.commentLinkContainer}>
+            <button
+              onClick={() => onToggleComment(dep.url)}
+              style={styles.commentLink}
+            >
+              {depComment ? '✓ comment (edit)' : '+ comment'}
+            </button>
+          </div>
         </td>
       </tr>
       {isExpanded && (
         <tr style={styles.detailsRow}>
           <td colSpan="3" style={styles.detailsCell}>
             <DependencyDetails dep={dep} depData={depData} />
+          </td>
+        </tr>
+      )}
+      {isCommentExpanded && (
+        <tr style={styles.commentRow}>
+          <td colSpan="3" style={styles.commentCell}>
+            <textarea
+              value={depComment || ''}
+              onChange={(e) => onCommentChange(dep.url, e.target.value)}
+              placeholder="Add notes about this dependency..."
+              style={styles.commentTextarea}
+              rows="3"
+            />
           </td>
         </tr>
       )}
@@ -1053,5 +1096,23 @@ const styles = {
     border: 'none',
     borderRadius: '6px',
     cursor: 'not-allowed',
+  },
+  commentLinkContainer: {
+    marginTop: '4px',
+  },
+  commentLink: {
+    fontSize: '12px',
+    color: '#718096',
+    backgroundColor: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '2px 0',
+    textDecoration: 'none',
+  },
+  commentRow: {
+    backgroundColor: '#f7fafc',
+  },
+  commentCell: {
+    padding: '12px 16px',
   },
 }

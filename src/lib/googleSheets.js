@@ -303,7 +303,7 @@ export async function submitRepoSelectionData(env, { ensName, initialRepos, veto
 }
 
 // Submit Level 3 Overview data (one row per dependency)
-export async function submitLevel3OverviewData(env, { ensName, repoUrl, dependencies, adjustedWeights, comment }) {
+export async function submitLevel3OverviewData(env, { ensName, repoUrl, dependencies, adjustedWeights, depComments }) {
   const accessToken = await getAccessToken(env);
   const sheetName = "Level3Overview";
   const submissionId = generateSubmissionId(); // Same ID for all rows in this submission
@@ -313,6 +313,7 @@ export async function submitLevel3OverviewData(env, { ensName, repoUrl, dependen
   const rows = dependencies.map((dep, index) => {
     const aiWeight = dep.aiWeight;
     const userWeight = adjustedWeights[dep.url] || 0;
+    const comment = depComments[dep.url] || ''; // Get per-dependency comment
 
     return [
       submissionId,
@@ -323,7 +324,7 @@ export async function submitLevel3OverviewData(env, { ensName, repoUrl, dependen
       dep.url,
       aiWeight.toString(),
       userWeight.toString(),
-      index === 0 ? (comment || '') : '' // Only include comment in first row
+      comment
     ];
   });
 

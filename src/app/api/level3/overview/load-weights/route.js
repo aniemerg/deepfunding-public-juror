@@ -32,8 +32,9 @@ export async function GET(req) {
     if (!data) {
       return Response.json({
         hasData: false,
-        weights: null,
-        comment: null
+        adjustedWeights: null,
+        editedFields: null,
+        depComments: null
       })
     }
 
@@ -41,8 +42,9 @@ export async function GET(req) {
 
     return Response.json({
       hasData: true,
-      weights: savedData.adjustedWeights || {},
-      comment: savedData.comment || '',
+      adjustedWeights: savedData.adjustedWeights || {},
+      editedFields: savedData.editedFields || [],
+      depComments: savedData.depComments || {},
       lastSaved: savedData.lastSaved
     })
   } catch (error) {

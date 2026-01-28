@@ -6,7 +6,7 @@ import { cookies } from 'next/headers'
 /**
  * Auto-save overview weights to KV
  * POST /api/level3/overview/save-weights
- * Body: { repoUrl, adjustedWeights, comment }
+ * Body: { repoUrl, adjustedWeights, editedFields, depComments }
  */
 export async function POST(req) {
   try {
@@ -17,7 +17,7 @@ export async function POST(req) {
       return Response.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const { repoUrl, adjustedWeights, comment } = await req.json()
+    const { repoUrl, adjustedWeights, editedFields, depComments } = await req.json()
 
     if (!repoUrl || !adjustedWeights) {
       return Response.json({ error: 'Missing required fields' }, { status: 400 })
@@ -30,7 +30,8 @@ export async function POST(req) {
     const data = {
       repoUrl,
       adjustedWeights,
-      comment: comment || '',
+      editedFields: editedFields || [],
+      depComments: depComments || {},
       lastSaved: new Date().toISOString()
     }
 
