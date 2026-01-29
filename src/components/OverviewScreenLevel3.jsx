@@ -862,11 +862,14 @@ const styles = {
     backgroundColor: 'white',
     borderRadius: '8px',
     border: '1px solid #e2e8f0',
-    overflow: 'hidden',
+    overflowX: 'auto',
+    overflowY: 'hidden',
     marginBottom: '24px',
+    WebkitOverflowScrolling: 'touch', // Smooth scrolling on iOS
   },
   table: {
     width: '100%',
+    minWidth: '600px', // Prevent column squashing on mobile
     borderCollapse: 'collapse',
   },
   headerRow: {
@@ -879,6 +882,7 @@ const styles = {
     fontSize: '14px',
     fontWeight: '600',
     color: '#2d3748',
+    minWidth: '200px',
   },
   headerCellNarrow: {
     padding: '12px 16px',
@@ -886,13 +890,15 @@ const styles = {
     fontSize: '14px',
     fontWeight: '600',
     color: '#2d3748',
-    width: '150px',
+    width: '120px',
+    minWidth: '120px',
   },
   row: {
     borderBottom: '1px solid #e2e8f0',
   },
   cellName: {
     padding: '12px 16px',
+    minWidth: '200px',
   },
   nameContainer: {
     display: 'flex',
@@ -928,10 +934,14 @@ const styles = {
     fontSize: '14px',
     color: '#4a5568',
     verticalAlign: 'top',
+    width: '120px',
+    minWidth: '120px',
   },
   cellWeightInput: {
     padding: '12px 16px',
     verticalAlign: 'top',
+    width: '120px',
+    minWidth: '120px',
   },
   weightInput: {
     width: '100px',
