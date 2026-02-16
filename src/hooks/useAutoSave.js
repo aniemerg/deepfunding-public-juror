@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 export function useAutosave(value, { user, dataType, id }) {
   const timer = useRef();
   useEffect(() => {
+    if (!user || !dataType) return;
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(async () => {
       await fetch("/api/save-progress", {

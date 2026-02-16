@@ -26,7 +26,8 @@ export function RepoSelectionScreen({ onNext, onBack, onForward, isCompleted }) 
     timestamp: new Date().toISOString()
   }
 
-  useAutosave(data, { user: user?.address, dataType: screenType, id: screenId })
+  // Avoid autosaving before initialization to prevent empty drafts overriding initial selection
+  useAutosave(data, { user: isInitialized ? user?.address : null, dataType: screenType, id: screenId })
   const { submitScreen, getSubmissionStatus } = useDataSubmission()
 
   useEffect(() => {
@@ -69,12 +70,22 @@ export function RepoSelectionScreen({ onNext, onBack, onForward, isCompleted }) 
         const vetoed = submission.data.vetoedRepos || []
         const final = submission.data.finalSelectedRepos || []
 
-        // Convert repo names to project objects
-        const { getProjectByRepo } = await import('@/lib/eloHelpers')
-        setInitialRepos(initial.map(repo => getProjectByRepo(repo)).filter(p => p))
-        setVetoedRepos(vetoed)
-        setSelectedRepos(final.map(repo => getProjectByRepo(repo)).filter(p => p))
-        setLastSubmittedAt(submission.data.timestamp)
+        const hasExistingSelection = initial.length > 0 || final.length > 0
+
+        if (hasExistingSelection) {
+          // Convert repo names to project objects
+          const { getProjectByRepo } = await import('@/lib/eloHelpers')
+          setInitialRepos(initial.map(repo => getProjectByRepo(repo)).filter(p => p))
+          setVetoedRepos(vetoed)
+          setSelectedRepos(final.map(repo => getProjectByRepo(repo)).filter(p => p))
+          setLastSubmittedAt(submission.data.timestamp)
+        } else {
+          // Draft exists but no selection saved yet - generate initial selection
+          const { getInitialRepoSelectionFromTopProjects } = await import('@/lib/eloHelpers')
+          const initialSelection = getInitialRepoSelectionFromTopProjects(topThreeArray)
+          setInitialRepos(initialSelection)
+          setSelectedRepos(initialSelection)
+        }
       } else {
         // Generate initial selection from top 3 (or fallback to random 10)
         const { getInitialRepoSelectionFromTopProjects } = await import('@/lib/eloHelpers')
