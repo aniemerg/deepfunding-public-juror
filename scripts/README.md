@@ -185,3 +185,41 @@ npm run kv -- clear yourname.eth
 ### Known Issues & Fixes
 
 **Nov 4, 2025 Fix**: The tool now includes the `--remote` flag in all wrangler commands. Previously, wrangler would check local development storage instead of remote Cloudflare KV, causing the tool to report empty data even when keys existed. This has been resolved.
+
+## Clone User KV (Cross-Env)
+
+Clone a user's KV data across environments with address remapping. This is useful for reproducing production issues in preview without copying identity/login state.
+
+### Usage
+
+```bash
+# Dry-run (default)
+node scripts/clone-user-kv.js --source-env=production --target-env=preview \
+  --source=devansh.voicedeck.eth --target=allanniemerg.eth --dry-run
+
+# Execute
+node scripts/clone-user-kv.js --source-env=production --target-env=preview \
+  --source=devansh.voicedeck.eth --target=allanniemerg.eth --execute
+```
+
+### Behavior
+
+- Copies only `user:<address>:*` keys.
+- Skips `user:<address>:profile` and `ens:*` by default to avoid stomping identity/login state.
+- Resolves ENS names from KV (`ens:<name> -> address`); pass a `0x` address if the ENS mapping isn’t present.
+
+### Flags
+
+- `--source-env=production|preview` (default: `production`)
+- `--target-env=preview|production` (default: `preview`)
+- `--source=<ens|address>`
+- `--target=<ens|address>`
+- `--execute` (required to apply changes)
+- `--dry-run` (default)
+- `--include-profile` (opt-in, copies `user:<address>:profile`)
+- `--include-ens` (opt-in, copies `ens:*` reverse mapping keys)
+
+### Notes
+
+- Uses Wrangler KV `--remote` for both source and target.
+- If Node version is old, run with `nvm use --lts` before invoking the script.

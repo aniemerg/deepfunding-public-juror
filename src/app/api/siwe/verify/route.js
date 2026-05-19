@@ -10,38 +10,177 @@ import { getCloudflareContext } from "@opennextjs/cloudflare"
 import { createPublicClient, http } from 'viem'
 import { mainnet, base } from 'viem/chains'
 
-// ENS Resolution function - uses viem to query blockchain directly (no caching)
-async function resolveENSName(address) {
+// Query ENS names owned by an address using The Graph ENS subgraph
+async function getOwnedEnsNames(address) {
+  const ENS_SUBGRAPH_URL = 'https://api.thegraph.com/subgraphs/name/ensdomains/ens'
+
+  const query = `
+    query GetOwnedNames($owner: String!) {
+      account(id: $owner) {
+        registrations {
+          labelName
+          expiryDate
+        }
+        wrappedDomains {
+          name
+          expiryDate
+        }
+      }
+      domains(where: { owner: $owner }) {
+        name
+        labelName
+      }
+    }
+  `
+
   try {
-    console.log('Backend: Resolving ENS for address:', address);
-
-    // Use viem to get ENS name directly from blockchain
-    const client = createPublicClient({
-      chain: mainnet,
-      transport: http()
+    const abort = new AbortController()
+    const timeout = setTimeout(() => abort.abort(), 5000)
+    const response = await fetch(ENS_SUBGRAPH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query,
+        variables: { owner: address.toLowerCase() }
+      }),
+      signal: abort.signal
     })
+    clearTimeout(timeout)
 
-    const ensName = await client.getEnsName({
-      address: address
-    })
-
-    if (ensName && ensName.endsWith('.eth')) {
-      console.log('Backend: Found ENS via viem:', ensName);
-      return ensName;
+    if (!response.ok) {
+      console.error('ENS subgraph query failed:', response.status)
+      return []
     }
 
-    console.log('Backend: No ENS found for address:', address);
-    return null;
+    const data = await response.json()
+
+    if (data.errors) {
+      console.error('ENS subgraph errors:', data.errors)
+      return []
+    }
+
+    const now = Math.floor(Date.now() / 1000)
+    const namesSet = new Set()
+
+    // Collect from registrations (traditional ERC-721)
+    if (data.data?.account?.registrations) {
+      data.data.account.registrations
+        .filter(reg => parseInt(reg.expiryDate) > now)
+        .forEach(reg => namesSet.add(`${reg.labelName}.eth`))
+    }
+
+    // Collect from wrapped domains (ERC-1155)
+    if (data.data?.account?.wrappedDomains) {
+      data.data.account.wrappedDomains
+        .filter(domain => {
+          // Check expiry if available
+          if (domain.expiryDate) {
+            return parseInt(domain.expiryDate) > now
+          }
+          return true // Include if no expiry data
+        })
+        .forEach(domain => {
+          // domain.name is already the full name (e.g., "vitalik.eth")
+          if (domain.name && domain.name.endsWith('.eth')) {
+            namesSet.add(domain.name)
+          }
+        })
+    }
+
+    // Collect from domains (owner field)
+    if (data.data?.domains) {
+      data.data.domains.forEach(domain => {
+        if (domain.name && domain.name.endsWith('.eth')) {
+          namesSet.add(domain.name)
+        } else if (domain.labelName) {
+          namesSet.add(`${domain.labelName}.eth`)
+        }
+      })
+    }
+
+    const activeNames = Array.from(namesSet).sort()
+    console.log(`Found ${activeNames.length} active ENS names for ${address}:`, activeNames)
+    return activeNames
+
   } catch (error) {
-    console.error('Backend: ENS resolution failed:', error);
-    return null;
+    console.error('Error querying ENS subgraph:', error)
+    return []
   }
 }
 
+// ENS Resolution function with fallback RPC endpoints and timeout
+async function resolveENSName(address, selectedEnsName = null) {
+  // STEP 1: Try reverse lookup first (preferred - fast with caching)
+  let infuraKey = null
+  try { infuraKey = getCloudflareContext().env.INFURA_API_KEY } catch (e) {}
+
+  const rpcEndpoints = [
+    infuraKey ? `https://mainnet.infura.io/v3/${infuraKey}` : null,
+    'https://cloudflare-eth.com',
+    'https://eth.drpc.org'
+  ].filter(Boolean)
+
+  for (const rpcUrl of rpcEndpoints) {
+    try {
+      console.log(`Backend: Trying ENS reverse lookup for ${address} via ${rpcUrl}`);
+
+      const client = createPublicClient({
+        chain: mainnet,
+        transport: http(rpcUrl, {
+          timeout: 5000
+        })
+      })
+
+      const ensName = await client.getEnsName({
+        address: address
+      })
+
+      if (ensName && ensName.endsWith('.eth')) {
+        console.log(`Backend: Found ENS via reverse lookup:`, ensName);
+        return { ensName, method: 'reverse', ownedNames: null }
+      }
+
+      console.log(`Backend: No reverse ENS found via ${rpcUrl}`);
+      break; // Exit loop on first successful connection (even if no name found)
+    } catch (error) {
+      console.error(`Backend: ENS resolution failed with ${rpcUrl}:`, error.message);
+      // Try next endpoint
+      continue;
+    }
+  }
+
+  // STEP 2: Reverse lookup failed, query owned ENS NFTs
+  console.log(`Backend: Reverse lookup failed, checking owned ENS names...`);
+  const ownedNames = await getOwnedEnsNames(address)
+
+  if (ownedNames.length === 0) {
+    console.log('Backend: No ENS names owned by this address');
+    return { ensName: null, method: 'none', ownedNames: [] }
+  }
+
+  // If user selected one from the list, validate and use it
+  if (selectedEnsName && ownedNames.includes(selectedEnsName)) {
+    console.log(`Backend: Using selected ENS name: ${selectedEnsName}`);
+    return { ensName: selectedEnsName, method: 'ownership', ownedNames }
+  }
+
+  // If only one ENS name owned, use it automatically
+  if (ownedNames.length === 1) {
+    console.log(`Backend: Auto-selecting single owned ENS: ${ownedNames[0]}`);
+    return { ensName: ownedNames[0], method: 'ownership', ownedNames }
+  }
+
+  // Multiple ENS names - need user to select
+  console.log(`Backend: User owns ${ownedNames.length} ENS names, selection required`);
+  return { ensName: null, method: 'multiple', ownedNames }
+}
+
 export async function POST(req) {
+  console.log('🚀 verify POST handler started')
   const cookieStore = await cookies()
   const session = await getIronSession(cookieStore, sessionOptions)
-  const { message, signature, inviteCode } = await req.json()
+  const { message, signature, inviteCode, selectedEnsName } = await req.json()
+  console.log('📨 verify request parsed, starting SIWE verification')
 
   try {
     const siwe = new SiweMessage(message)
@@ -104,9 +243,14 @@ export async function POST(req) {
     try {
       // Select chain based on chainId from SIWE message
       const chain = siwe.chainId === 8453 ? base : mainnet
+      let sigVerifyKey = null
+      try { sigVerifyKey = getCloudflareContext().env.INFURA_API_KEY } catch (e) {}
+      const rpcUrl = sigVerifyKey
+        ? `https://mainnet.infura.io/v3/${sigVerifyKey}`
+        : 'https://cloudflare-eth.com'
       const client = createPublicClient({
         chain,
-        transport: http()
+        transport: http(rpcUrl, { timeout: 8000 })
       })
 
       // Verify the signature - viem handles both EOA and smart wallet signatures
@@ -134,12 +278,63 @@ export async function POST(req) {
     }
 
     // Resolve ENS name - REQUIRED for login
-    const ensName = await resolveENSName(siwe.address);
+    // Check cache first to speed up returning users
+    let ensName = null;
+    let ensResolutionResult = null;
+
+    try {
+      const env = getCloudflareContext().env;
+      const profileKey = `user:${siwe.address.toLowerCase()}:profile`;
+      const cachedProfile = await env.JURY_DATA.get(profileKey);
+
+      if (cachedProfile) {
+        const profile = JSON.parse(cachedProfile);
+        const cacheAge = Date.now() - new Date(profile.lastLogin).getTime();
+        const cacheTTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+        if (cacheAge < cacheTTL && profile.ensName) {
+          ensName = profile.ensName;
+          console.log('Backend: Using cached ENS name:', ensName);
+        } else {
+          console.log('Backend: Cached ENS expired, will lookup fresh');
+        }
+      }
+    } catch (cacheError) {
+      console.log('Backend: Cache lookup failed, will do full ENS resolution:', cacheError.message);
+    }
+
+    // If not cached, do full ENS resolution
     if (!ensName) {
+      ensResolutionResult = await resolveENSName(siwe.address, selectedEnsName || null);
+      ensName = ensResolutionResult.ensName;
+    }
+
+    // Handle different resolution outcomes
+    if (!ensName) {
+      if (ensResolutionResult?.method === 'none') {
+        return NextResponse.json({
+          error: 'ENS Name Required',
+          message: 'To participate, you must own an ENS name ending in .eth.',
+          helpUrl: 'https://ens.domains',
+          address: siwe.address
+        }, { status: 403 })
+      }
+
+      if (ensResolutionResult?.method === 'multiple') {
+        return NextResponse.json({
+          error: 'Multiple ENS Names Found',
+          message: 'You own multiple ENS names. Please select which one to use.',
+          ownedNames: ensResolutionResult.ownedNames,
+          requiresSelection: true,
+          address: siwe.address
+        }, { status: 409 }) // 409 Conflict - needs user selection
+      }
+
+      // Fallback error for any other case
       return NextResponse.json({
-        error: 'Primary ENS Name Required',
-        message: 'To participate, you must own an ENS name ending in .eth and set it as your Primary ENS Name for this wallet address.',
-        helpUrl: 'https://support.ens.domains/en/articles/8684192-how-to-set-as-primary-name',
+        error: 'ENS Name Required',
+        message: 'To participate, you must own an ENS name ending in .eth.',
+        helpUrl: 'https://ens.domains',
         address: siwe.address
       }, { status: 403 })
     }
@@ -162,18 +357,30 @@ export async function POST(req) {
     session.siweNonce = null
     await session.save()
 
-    // Store ENS name in KV for easy access (e.g., by kv-manager tool)
+    // Store/update ENS name in KV for caching and easy access
     try {
       const env = getCloudflareContext().env;
       const profileKey = `user:${siwe.address.toLowerCase()}:profile`;
       const ensLookupKey = `ens:${ensName}`;
 
-      // Store user profile (address → profile data)
+      // Check if profile exists to preserve firstLogin
+      let firstLogin = new Date().toISOString();
+      try {
+        const existing = await env.JURY_DATA.get(profileKey);
+        if (existing) {
+          const existingProfile = JSON.parse(existing);
+          firstLogin = existingProfile.firstLogin || firstLogin;
+        }
+      } catch (e) {
+        // New user, use current timestamp
+      }
+
+      // Store/update user profile (address → profile data)
       await env.JURY_DATA.put(profileKey, JSON.stringify({
         ensName: ensName,
         address: siwe.address.toLowerCase(),
         chainId: siwe.chainId,
-        firstLogin: new Date().toISOString(),
+        firstLogin: firstLogin,
         lastLogin: new Date().toISOString()
       }));
 

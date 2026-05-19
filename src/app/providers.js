@@ -1,5 +1,5 @@
 'use client'
-import { WagmiProvider, http } from 'wagmi'
+import { WagmiProvider, http, fallback } from 'wagmi'
 import { mainnet, sepolia } from 'wagmi/chains'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit'
@@ -13,7 +13,11 @@ const config = getDefaultConfig({
   projectId,
   chains: [mainnet, sepolia],
   transports: {
-    [mainnet.id]: http(),
+    [mainnet.id]: fallback([
+      http('https://eth.llamarpc.com'),
+      http('https://rpc.ankr.com/eth'),
+      http('https://eth.drpc.org'),
+    ]),
     [sepolia.id]: http(),
   },
 })

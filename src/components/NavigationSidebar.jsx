@@ -1,16 +1,19 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useRouter } from 'next/navigation'
 
 export function NavigationSidebar({
   navigationItems,
   currentScreen,
   onNavigate,
   isMobileMenuOpen = false,
-  onCloseMobileMenu = () => {}
+  onCloseMobileMenu = () => {},
+  showLevel3Link = false
 }) {
   const [itemWidths, setItemWidths] = useState({})
   const sidebarRef = useRef()
+  const router = useRouter()
 
   // Measure available width for each navigation item
   useEffect(() => {
@@ -33,37 +36,59 @@ export function NavigationSidebar({
 
   const truncateText = (text, availableWidth) => {
     if (!availableWidth) return text
-    
+
     // Rough character width estimation (this could be more precise)
     const charWidth = 8
     const maxChars = Math.floor(availableWidth / charWidth)
-    
+
     if (text.length <= maxChars) return text
-    
+
     // Truncation hierarchy for different text types
     if (text.startsWith('Comparison:')) {
       const match = text.match(/Comparison: (.+) vs (.+)/)
       if (match) {
         const [, projectA, projectB] = match
-        
-        if (maxChars >= 50) {
-          // Full version
-          return text
-        } else if (maxChars >= 30) {
-          // Medium: strip org names
-          const nameA = projectA.split('/')[1] || projectA
-          const nameB = projectB.split('/')[1] || projectB
-          return `Comparison: ${nameA} vs ${nameB}`
-        } else if (maxChars >= 20) {
-          // Short version
-          const nameA = (projectA.split('/')[1] || projectA).substring(0, 8)
-          const nameB = (projectB.split('/')[1] || projectB).substring(0, 8)
-          return `Comp: ${nameA} vs ${nameB}`
+
+        // Check if these are dependency names (no slashes) or repo names (with slashes)
+        const isDependencies = !projectA.includes('/') && !projectB.includes('/')
+
+        if (isDependencies) {
+          // Level 3: Dependency names (shorter, cleaner)
+          if (maxChars >= 40) {
+            return text
+          } else if (maxChars >= 25) {
+            // Truncate long package names
+            const nameA = projectA.length > 12 ? projectA.substring(0, 12) + '…' : projectA
+            const nameB = projectB.length > 12 ? projectB.substring(0, 12) + '…' : projectB
+            return `Comp: ${nameA} vs ${nameB}`
+          } else if (maxChars >= 15) {
+            const nameA = projectA.substring(0, 6)
+            const nameB = projectB.substring(0, 6)
+            return `${nameA} vs ${nameB}`
+          } else {
+            return `C: ${projectA.substring(0, 4)} vs ${projectB.substring(0, 4)}`
+          }
         } else {
-          // Tiny version
-          const nameA = (projectA.split('/')[1] || projectA).substring(0, 4)
-          const nameB = (projectB.split('/')[1] || projectB).substring(0, 4)
-          return `C: ${nameA} vs ${nameB}`
+          // Level 1/2: Repository names (with org/repo format)
+          if (maxChars >= 50) {
+            // Full version
+            return text
+          } else if (maxChars >= 30) {
+            // Medium: strip org names
+            const nameA = projectA.split('/')[1] || projectA
+            const nameB = projectB.split('/')[1] || projectB
+            return `Comparison: ${nameA} vs ${nameB}`
+          } else if (maxChars >= 20) {
+            // Short version
+            const nameA = (projectA.split('/')[1] || projectA).substring(0, 8)
+            const nameB = (projectB.split('/')[1] || projectB).substring(0, 8)
+            return `Comp: ${nameA} vs ${nameB}`
+          } else {
+            // Tiny version
+            const nameA = (projectA.split('/')[1] || projectA).substring(0, 4)
+            const nameB = (projectB.split('/')[1] || projectB).substring(0, 4)
+            return `C: ${nameA} vs ${nameB}`
+          }
         }
       }
     } else if (text.startsWith('Similar:')) {
@@ -177,6 +202,17 @@ export function NavigationSidebar({
           })}
         </div>
 
+        {showLevel3Link && (
+          <div className="level3-section">
+            <button
+              className="level3-link"
+              onClick={() => router.push('/level3')}
+            >
+              Level 3: Dependencies →
+            </button>
+          </div>
+        )}
+
       <style jsx>{`
         /* Mobile backdrop - hidden on desktop */
         .mobile-backdrop {
@@ -284,6 +320,31 @@ export function NavigationSidebar({
           flex: 1;
           overflow: hidden;
           white-space: nowrap;
+        }
+
+        .level3-section {
+          margin-top: auto;
+          padding-top: 1rem;
+          border-top: 1px solid #e2e8f0;
+        }
+
+        .level3-link {
+          width: 100%;
+          padding: 0.75rem;
+          background-color: #ebf8ff;
+          border: 1px solid #bfdbfe;
+          border-radius: 6px;
+          color: #1e40af;
+          font-size: 0.9rem;
+          font-weight: 500;
+          cursor: pointer;
+          text-align: left;
+          transition: all 0.2s;
+        }
+
+        .level3-link:hover {
+          background-color: #dbeafe;
+          border-color: #93c5fd;
         }
 
         /* Mobile responsiveness */

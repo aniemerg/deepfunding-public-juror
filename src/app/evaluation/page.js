@@ -16,6 +16,21 @@ export default function EvaluationPage() {
   const { user, isLoggedIn, isLoading, logout } = useAuth()
   const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [level3Enabled, setLevel3Enabled] = useState(false)
+
+  // Check Level 3 feature flag
+  useEffect(() => {
+    async function checkLevel3() {
+      try {
+        const response = await fetch('/api/level3/feature-check')
+        const data = await response.json()
+        setLevel3Enabled(data.enabled)
+      } catch (error) {
+        console.error('Failed to check Level 3 feature flag:', error)
+      }
+    }
+    checkLevel3()
+  }, [])
 
   // Debug logging - try multiple possible address fields
   const userAddress = user?.address || user?.ensName || user?.walletAddress
@@ -137,6 +152,11 @@ export default function EvaluationPage() {
   }
 
 
+
+  // Check if background screen is completed
+  const isBackgroundCompleted = navigationState?.navigationItems?.some(
+    item => item.screenType === 'background' && (item.status === 'completed' || item.status === 'skipped')
+  ) || false
 
   const renderCurrentScreen = () => {
     const currentNavItem = navigationState.navigationItems.find(item => item.id === navigationState.currentScreen)
@@ -280,6 +300,7 @@ export default function EvaluationPage() {
           onNavigate={handleNavigateToScreen}
           isMobileMenuOpen={isMobileMenuOpen}
           onCloseMobileMenu={() => setIsMobileMenuOpen(false)}
+          showLevel3Link={level3Enabled && isBackgroundCompleted}
         />
 
         <div style={styles.mainContent}>

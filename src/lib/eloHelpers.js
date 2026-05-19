@@ -7,6 +7,38 @@ import { ELO_PROJECTS } from './eloDataset'
 // Re-export ELO_PROJECTS for use in other modules
 export { ELO_PROJECTS }
 
+// Repos that need more comparison data — drawn first during repo selection.
+// Only after all 27 are vetoed/selected does the full pool open up.
+const PRIORITY_REPOS = new Set([
+  'paulmillr/noble-curves',
+  'herumi/mcl',
+  'arkworks-rs/algebra',
+  'wighawag/hardhat-deploy',
+  'Vectorized/solady',
+  'taikoxyz/taiko-mono',
+  'Plonky3/Plonky3',
+  'ChainSafe/bls',
+  'Certora/CertoraProver',
+  'intellij-solidity/intellij-solidity',
+  'wealdtech/ethdo',
+  'TrueBlocks/trueblocks-core',
+  'shazow/whatsabi',
+  'skalenetwork/libBLS',
+  'EspressoSystems/jellyfish',
+  '0xMiden/miden-vm',
+  'smartcontracts/simple-optimism-node',
+  'a16z/halmos',
+  'otterscan/otterscan',
+  'Commit-Boost/commit-boost-client',
+  'OffchainLabs/stylus-sdk-rs',
+  'evmts/tevm-monorepo',
+  'powdr-labs/powdr',
+  'aestus-relay/mev-boost-relay',
+  'dl-solarity/solidity-lib',
+  'axiom-crypto/snark-verifier',
+  'holiman/goevmlab',
+])
+
 // Get all projects as an array of repo names
 export function getAllProjects() {
   return ELO_PROJECTS.map(p => p.repo);
@@ -123,17 +155,23 @@ export function getInitialRepoSelection(mostValuableRepo, leastValuableRepo) {
   return [...selected, ...additional];
 }
 
-// Get a random project excluding specific repos
+// Get a random project excluding specific repos.
+// Draws from PRIORITY_REPOS first; falls back to full pool only when all 27 are excluded.
 export function getRandomRepoExcluding(excludeRepos = []) {
-  const available = ELO_PROJECTS.filter(p => !excludeRepos.includes(p.repo));
+  const priorityAvailable = ELO_PROJECTS.filter(
+    p => PRIORITY_REPOS.has(p.repo) && !excludeRepos.includes(p.repo)
+  )
 
-  if (available.length === 0) {
+  const pool = priorityAvailable.length > 0
+    ? priorityAvailable
+    : ELO_PROJECTS.filter(p => !excludeRepos.includes(p.repo))
+
+  if (pool.length === 0) {
     console.error('No available repos after exclusion');
     return null;
   }
 
-  const index = Math.floor(Math.random() * available.length);
-  return available[index];
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 // Get random pair from a list of selected repos
@@ -282,11 +320,22 @@ export function getInitialRepoSelectionFromTopProjects(topThreeRepos) {
     return shuffled.slice(0, 10);
   }
 
-  // Get 7 more random projects (excluding the locked three)
+  // Fill 7 slots from PRIORITY_REPOS first; fall back to full pool if exhausted
   const excludeRepos = lockedProjects.map(p => p.repo);
-  const available = ELO_PROJECTS.filter(p => !excludeRepos.includes(p.repo));
-  const shuffled = [...available].sort(() => Math.random() - 0.5);
-  const additionalProjects = shuffled.slice(0, 7);
+  const priorityAvailable = ELO_PROJECTS.filter(
+    p => PRIORITY_REPOS.has(p.repo) && !excludeRepos.includes(p.repo)
+  );
+  const shuffledPriority = [...priorityAvailable].sort(() => Math.random() - 0.5);
+  const additionalProjects = shuffledPriority.slice(0, 7);
+
+  if (additionalProjects.length < 7) {
+    const alreadyUsed = new Set([...excludeRepos, ...additionalProjects.map(p => p.repo)]);
+    const fallback = ELO_PROJECTS
+      .filter(p => !alreadyUsed.has(p.repo))
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 7 - additionalProjects.length);
+    additionalProjects.push(...fallback);
+  }
 
   return [...lockedProjects, ...additionalProjects];
 }

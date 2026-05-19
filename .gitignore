@@ -50,3 +50,7 @@ design/
 # ignore AI
 CLAUDE.md
 .env.local
+
+# local/generated admin outputs
+git_log.txt
+tokens-*.csv
