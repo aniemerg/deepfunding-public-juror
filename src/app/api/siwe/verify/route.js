@@ -34,14 +34,18 @@ async function getOwnedEnsNames(address) {
   `
 
   try {
+    const abort = new AbortController()
+    const timeout = setTimeout(() => abort.abort(), 5000)
     const response = await fetch(ENS_SUBGRAPH_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         query,
         variables: { owner: address.toLowerCase() }
-      })
+      }),
+      signal: abort.signal
     })
+    clearTimeout(timeout)
 
     if (!response.ok) {
       console.error('ENS subgraph query failed:', response.status)
@@ -107,15 +111,14 @@ async function getOwnedEnsNames(address) {
 // ENS Resolution function with fallback RPC endpoints and timeout
 async function resolveENSName(address, selectedEnsName = null) {
   // STEP 1: Try reverse lookup first (preferred - fast with caching)
+  let infuraKey = null
+  try { infuraKey = getCloudflareContext().env.INFURA_API_KEY } catch (e) {}
+
   const rpcEndpoints = [
-    process.env.INFURA_API_KEY
-      ? `https://mainnet.infura.io/v3/${process.env.INFURA_API_KEY}`
-      : null,
+    infuraKey ? `https://mainnet.infura.io/v3/${infuraKey}` : null,
     'https://cloudflare-eth.com',
-    'https://eth.llamarpc.com',
-    'https://rpc.ankr.com/eth',
     'https://eth.drpc.org'
-  ].filter(Boolean) // Remove null entries if no Infura key
+  ].filter(Boolean)
 
   for (const rpcUrl of rpcEndpoints) {
     try {
@@ -124,7 +127,7 @@ async function resolveENSName(address, selectedEnsName = null) {
       const client = createPublicClient({
         chain: mainnet,
         transport: http(rpcUrl, {
-          timeout: 10000 // 10 second timeout per attempt
+          timeout: 5000
         })
       })
 
@@ -173,9 +176,11 @@ async function resolveENSName(address, selectedEnsName = null) {
 }
 
 export async function POST(req) {
+  console.log('🚀 verify POST handler started')
   const cookieStore = await cookies()
   const session = await getIronSession(cookieStore, sessionOptions)
   const { message, signature, inviteCode, selectedEnsName } = await req.json()
+  console.log('📨 verify request parsed, starting SIWE verification')
 
   try {
     const siwe = new SiweMessage(message)
@@ -238,9 +243,14 @@ export async function POST(req) {
     try {
       // Select chain based on chainId from SIWE message
       const chain = siwe.chainId === 8453 ? base : mainnet
+      let sigVerifyKey = null
+      try { sigVerifyKey = getCloudflareContext().env.INFURA_API_KEY } catch (e) {}
+      const rpcUrl = sigVerifyKey
+        ? `https://mainnet.infura.io/v3/${sigVerifyKey}`
+        : 'https://cloudflare-eth.com'
       const client = createPublicClient({
         chain,
-        transport: http()
+        transport: http(rpcUrl, { timeout: 8000 })
       })
 
       // Verify the signature - viem handles both EOA and smart wallet signatures

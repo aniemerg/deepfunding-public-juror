@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createPublicClient, http, normalize } from 'viem'
+import { createPublicClient, http } from 'viem'
 import { mainnet } from 'viem/chains'
 
 // Server-side ENS resolution using viem (direct blockchain queries, no caching)
@@ -15,50 +15,50 @@ export async function GET(req) {
     }, { status: 400 })
   }
 
-  try {
-    // Use viem to get ENS name directly from blockchain
-    const client = createPublicClient({
-      chain: mainnet,
-      transport: http()
-    })
+  const rpcEndpoints = [
+    'https://eth.llamarpc.com',
+    'https://rpc.ankr.com/eth',
+    'https://eth.drpc.org',
+  ]
 
-    const ensName = await client.getEnsName({
-      address: address
-    })
+  for (const rpcUrl of rpcEndpoints) {
+    try {
+      const client = createPublicClient({
+        chain: mainnet,
+        transport: http(rpcUrl, { timeout: 5000 })
+      })
 
-    // Validate the response
-    if (ensName && ensName.endsWith('.eth')) {
-      // Try to get the avatar
-      let avatar = null
-      try {
-        const avatarUrl = await client.getEnsAvatar({
-          name: normalize(ensName)
+      const ensName = await client.getEnsName({ address })
+
+      if (ensName && ensName.endsWith('.eth')) {
+        let avatar = null
+        try {
+          avatar = await client.getEnsAvatar({ name: ensName })
+        } catch (avatarError) {
+          console.log('Avatar resolution failed (optional):', avatarError.message)
+        }
+
+        return NextResponse.json({
+          success: true,
+          name: ensName,
+          address: address,
+          displayName: ensName,
+          avatar: avatar
         })
-        avatar = avatarUrl
-      } catch (avatarError) {
-        console.log('Avatar resolution failed (optional):', avatarError.message)
       }
 
       return NextResponse.json({
-        success: true,
-        name: ensName,
-        address: address,
-        displayName: ensName,
-        avatar: avatar
-      })
+        success: false,
+        error: 'No ENS name found for this address'
+      }, { status: 404 })
+
+    } catch (error) {
+      console.error(`ENS resolution failed via ${rpcUrl}:`, error.message)
     }
-
-    // No valid ENS name found
-    return NextResponse.json({
-      success: false,
-      error: 'No ENS name found for this address'
-    }, { status: 404 })
-
-  } catch (error) {
-    console.error('ENS resolution error:', error)
-    return NextResponse.json({
-      success: false,
-      error: 'Failed to resolve ENS name'
-    }, { status: 500 })
   }
+
+  return NextResponse.json({
+    success: false,
+    error: 'Failed to resolve ENS name'
+  }, { status: 500 })
 }

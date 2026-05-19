@@ -370,6 +370,25 @@ async function appendMultipleRows(env, accessToken, sheetName, rows) {
   return await res.json();
 }
 
+// Read all rows from a sheet (including headers)
+export async function readSheetValues(env, sheetName) {
+  const accessToken = await getAccessToken(env);
+  const sheetId = getSheetId(env);
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${sheetName}`;
+
+  const res = await fetch(url, {
+    headers: { "authorization": `Bearer ${accessToken}` }
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Sheets read failed: ${res.status} ${errorText}`);
+  }
+
+  const data = await res.json();
+  return data.values || [];
+}
+
 // Submit session data (login tracking)
 export async function submitSessionData(env, { ensName, walletAddress, inviteCode }) {
   const accessToken = await getAccessToken(env);

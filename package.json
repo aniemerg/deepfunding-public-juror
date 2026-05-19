@@ -16,6 +16,7 @@
 		"preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
 		"cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
 		"kv": "node scripts/kv-manager.js",
+		"tokens": "node scripts/generate-tokens.js",
 		"setup-ai-db": "node scripts/setup-ai-comparisons-db.js",
 		"setup-ai-db:preview": "node scripts/setup-ai-comparisons-db.js --env=preview",
 		"populate-ai-comparisons": "node scripts/populate-ai-comparisons.js"

@@ -44,6 +44,12 @@
   "env": {
     "preview": {
       "name": "deepfunding-jury-scoring-preview",
+      "services": [
+        {
+          "binding": "WORKER_SELF_REFERENCE",
+          "service": "deepfunding-jury-scoring-preview"
+        }
+      ],
       "kv_namespaces": [
         {
           "binding": "JURY_DATA",

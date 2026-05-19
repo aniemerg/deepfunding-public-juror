@@ -158,87 +158,11 @@ export default function OverviewScreenLevel3({
     }
   }
 
-  // Weight change handler with normalization
+  // Weight change handler - updates only the changed field, no auto-rebalancing
   const handleWeightChange = useCallback((depUrl, newWeight) => {
-    // Mark this field as edited
     setEditedFields(prev => new Set([...prev, depUrl]))
-
-    const currentWeight = adjustedWeights[depUrl] || 0
-    const otherDeps = Object.keys(adjustedWeights).filter(url => url !== depUrl)
-    const uneditedDeps = otherDeps.filter(url => !editedFields.has(url))
-    const editedDeps = otherDeps.filter(url => editedFields.has(url))
-
-    const uneditedSum = uneditedDeps.reduce((sum, url) => sum + adjustedWeights[url], 0)
-
-    if (uneditedDeps.length > 0 && uneditedSum > 0) {
-      const remainingWeight = 1 - newWeight
-      const editedSum = editedDeps.reduce((sum, url) => sum + adjustedWeights[url], 0)
-      const availableForUnedited = remainingWeight - editedSum
-
-      const updated = { ...adjustedWeights, [depUrl]: newWeight }
-
-      if (availableForUnedited <= 0) {
-        // Not enough room, scale all other fields
-        const totalOtherWeight = remainingWeight
-        otherDeps.forEach(url => {
-          const proportion = adjustedWeights[url] / (otherDeps.reduce((s, u) => s + adjustedWeights[u], 0))
-          updated[url] = totalOtherWeight * proportion
-        })
-      } else {
-        // Distribute among unedited fields only
-        uneditedDeps.forEach(url => {
-          const proportion = adjustedWeights[url] / uneditedSum
-          updated[url] = availableForUnedited * proportion
-        })
-      }
-
-      setAdjustedWeights(updated)
-
-      // Update input values for OTHER fields only (not the one being edited)
-      setInputValues(prev => {
-        const newInputValues = { ...prev }
-        Object.keys(updated).forEach(url => {
-          if (url !== depUrl) {
-            newInputValues[url] = (updated[url] * 100).toFixed(2)
-          }
-        })
-        return newInputValues
-      })
-    } else {
-      // No unedited fields
-      const updated = { ...adjustedWeights, [depUrl]: newWeight }
-      const remainingWeight = 1 - newWeight
-
-      if (otherDeps.length > 0) {
-        const otherSum = otherDeps.reduce((sum, url) => sum + adjustedWeights[url], 0)
-
-        if (otherSum > 0) {
-          otherDeps.forEach(url => {
-            const proportion = adjustedWeights[url] / otherSum
-            updated[url] = remainingWeight * proportion
-          })
-        } else {
-          const perDep = remainingWeight / otherDeps.length
-          otherDeps.forEach(url => {
-            updated[url] = perDep
-          })
-        }
-      }
-
-      setAdjustedWeights(updated)
-
-      // Update input values for OTHER fields
-      setInputValues(prev => {
-        const newInputValues = { ...prev }
-        Object.keys(updated).forEach(url => {
-          if (url !== depUrl) {
-            newInputValues[url] = (updated[url] * 100).toFixed(2)
-          }
-        })
-        return newInputValues
-      })
-    }
-  }, [adjustedWeights, editedFields])
+    setAdjustedWeights(prev => ({ ...prev, [depUrl]: newWeight }))
+  }, [])
 
   // Reset to AI weights
   const handleReset = () => {
@@ -340,13 +264,8 @@ export default function OverviewScreenLevel3({
     return Object.values(adjustedWeights).reduce((sum, w) => sum + w, 0)
   }, [adjustedWeights])
 
-  const isValid = Math.abs(totalWeight - 1.0) < 0.0001
-
   // Submit handler
   const handleSubmit = async () => {
-    if (!isValid) {
-      return
-    }
 
     setIsSubmitting(true)
     try {
@@ -420,9 +339,8 @@ export default function OverviewScreenLevel3({
         <div style={styles.statusBar}>
           <div style={styles.statusItem}>
             <span style={styles.statusLabel}>Total:</span>
-            <span style={isValid ? styles.statusValueValid : styles.statusValueInvalid}>
+            <span style={styles.statusValue}>
               {(totalWeight * 100).toFixed(2)}%
-              {isValid ? ' ✓' : ' ⚠️'}
             </span>
           </div>
           <div style={styles.statusItem}>
@@ -501,15 +419,10 @@ export default function OverviewScreenLevel3({
 
       {/* Submit Section */}
       <div style={styles.submitSection}>
-        {!isValid && (
-          <div style={styles.validationWarning}>
-            ⚠️ Total must equal 100% before submitting
-          </div>
-        )}
         <button
           onClick={handleSubmit}
-          disabled={!isValid || isSubmitting}
-          style={isValid && !isSubmitting ? styles.submitButton : styles.submitButtonDisabled}
+          disabled={isSubmitting}
+          style={!isSubmitting ? styles.submitButton : styles.submitButtonDisabled}
         >
           {isSubmitting ? 'Submitting...' : 'Submit Evaluation'}
         </button>

@@ -8,6 +8,7 @@
  *   node scripts/kv-manager.js inspect <user> [--verbose] [--env=preview|production]
  *   node scripts/kv-manager.js export <user> <file> [--env=preview|production]
  *   node scripts/kv-manager.js clear <user> [--env=preview|production]
+ *   node scripts/kv-manager.js reset-level1 <user> [--env=preview|production]
  *   node scripts/kv-manager.js clear-pattern <pattern> [--env=preview|production]
  *   node scripts/kv-manager.js clear-local
  *
@@ -388,6 +389,111 @@ async function cmdClear(user, env, useLocal = false) {
   success(`Deleted ${deleted} keys`);
 }
 
+// Command: reset-level1 - Reset Level 1 evaluation back to repo_selection screen
+// Preserves: profile, background (data + completion), top_projects (data + completion), all level3 data
+// Deletes: evaluation-plan, navigation-state cache, completion/in-progress records for
+//          repo_selection, comparisons, originality, and legacy similar_projects screens
+async function cmdResetLevel1(user, env, useLocal = false) {
+  const storageType = useLocal ? 'local' : 'remote';
+
+  // Resolve ENS to address
+  const address = resolveENS(user, env, useLocal);
+  const ensName = getENSFromKV(address, env, useLocal);
+  const displayName = ensName ? `${ensName} (${address})` : address;
+
+  // Get all keys for this user
+  const allKeys = getAllKeys(env, useLocal);
+  const userKeys = allKeys.filter(key => key.startsWith(`user:${address}:`));
+
+  if (userKeys.length === 0) {
+    warning('No data found for this user.');
+    return;
+  }
+
+  // Keys to preserve (never delete these)
+  const preservePatterns = [
+    /^user:[^:]+:profile$/,
+    /^user:[^:]+:completed:background$/,
+    /^user:[^:]+:background$/,
+    /^user:[^:]+:completed:top_projects$/,
+    /^user:[^:]+:top_projects$/,
+    /^user:[^:]+:level3:/,
+  ];
+
+  const isPreserved = (key) => preservePatterns.some(p => p.test(key));
+
+  // Keys to delete: evaluation-plan, navigation-state, and completion/in-progress
+  // for repo_selection, comparison_*, originality_*, similar_projects_* (legacy)
+  const deletePatterns = [
+    /^user:[^:]+:evaluation-plan$/,
+    /^user:[^:]+:navigation-state$/,
+    /^user:[^:]+:completed:repo_selection$/,
+    /^user:[^:]+:completed:comparison_/,
+    /^user:[^:]+:completed:originality_/,
+    /^user:[^:]+:completed:similar_projects_/,
+    /^user:[^:]+:in-progress:repo_selection$/,
+    /^user:[^:]+:in-progress:comparison_/,
+    /^user:[^:]+:in-progress:originality_/,
+    /^user:[^:]+:in-progress:similar_projects_/,
+  ];
+
+  const shouldDelete = (key) => deletePatterns.some(p => p.test(key));
+
+  const keysToDelete = userKeys.filter(key => shouldDelete(key) && !isPreserved(key));
+  const keysToKeep = userKeys.filter(key => !shouldDelete(key) || isPreserved(key));
+
+  if (keysToDelete.length === 0) {
+    warning('No Level 1 reset keys found for this user (already reset, or no evaluation started).');
+    return;
+  }
+
+  // Show plan
+  log('');
+  if (env === 'production' && !useLocal) {
+    log(`PRODUCTION reset-level1 for: ${displayName}`, colors.red + colors.bright);
+  } else {
+    info(`reset-level1 for: ${displayName} in ${storageType} KV (${env})`);
+  }
+  log('');
+  log('Keys to DELETE:', colors.red);
+  keysToDelete.forEach(k => log(`  - ${k}`));
+  log('');
+  log('Keys to KEEP:', colors.green);
+  keysToKeep.forEach(k => log(`  + ${k}`));
+  log('');
+
+  // Require explicit confirmation
+  const readline = require('readline');
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const confirmed = await new Promise(resolve => {
+    const prompt = env === 'production'
+      ? `Type "reset production ${ensName || address}" to confirm: `
+      : `Confirm reset? (yes/no): `;
+    rl.question(prompt, answer => {
+      rl.close();
+      if (env === 'production') {
+        resolve(answer.trim() === `reset production ${ensName || address}`);
+      } else {
+        resolve(answer.trim().toLowerCase() === 'yes');
+      }
+    });
+  });
+
+  if (!confirmed) {
+    warning('Aborted.');
+    return;
+  }
+
+  let deleted = 0;
+  for (const key of keysToDelete) {
+    if (deleteKey(key, env, useLocal)) {
+      deleted++;
+    }
+  }
+
+  success(`Reset complete: deleted ${deleted} keys. User will restart at repo_selection.`);
+}
+
 // Command: clear-pattern - Delete keys matching pattern
 async function cmdClearPattern(pattern, env) {
   // Get all keys and filter by pattern
@@ -450,6 +556,7 @@ function showHelp() {
   log('  inspect <user>    View data for a user (ENS name or address)');
   log('  export <user> <file>   Export user data to JSON file');
   log('  clear <user>      Delete all data for a user');
+  log('  reset-level1 <user>   Reset Level 1 to repo_selection (keeps background, top_projects, level3)');
   log('  clear-pattern <pattern>   Delete keys matching pattern from remote KV');
   log('  clear-local       Delete local development storage (.wrangler/state)');
   log('\nFlags:', colors.cyan);
@@ -512,6 +619,14 @@ async function main() {
           process.exit(1);
         }
         await cmdClear(params[0], env, useLocal);
+        break;
+
+      case 'reset-level1':
+        if (params.length < 1) {
+          error('Usage: kv-manager reset-level1 <user> [--local] [--env=preview|production]');
+          process.exit(1);
+        }
+        await cmdResetLevel1(params[0], env, useLocal);
         break;
 
       case 'clear-pattern':
