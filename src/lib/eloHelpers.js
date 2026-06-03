@@ -8,35 +8,16 @@ import { ELO_PROJECTS } from './eloDataset'
 export { ELO_PROJECTS }
 
 // Repos that need more comparison data — drawn first during repo selection.
-// Only after all 27 are vetoed/selected does the full pool open up.
+// Only after all are vetoed/selected does the full pool open up.
 const PRIORITY_REPOS = new Set([
-  'paulmillr/noble-curves',
-  'herumi/mcl',
-  'arkworks-rs/algebra',
-  'wighawag/hardhat-deploy',
-  'Vectorized/solady',
-  'taikoxyz/taiko-mono',
-  'Plonky3/Plonky3',
-  'ChainSafe/bls',
-  'Certora/CertoraProver',
   'intellij-solidity/intellij-solidity',
   'wealdtech/ethdo',
-  'TrueBlocks/trueblocks-core',
   'shazow/whatsabi',
-  'skalenetwork/libBLS',
-  'EspressoSystems/jellyfish',
-  '0xMiden/miden-vm',
-  'smartcontracts/simple-optimism-node',
-  'a16z/halmos',
-  'otterscan/otterscan',
-  'Commit-Boost/commit-boost-client',
+  'TrueBlocks/trueblocks-core',
+  'wighawag/hardhat-deploy',
+  'arkworks-rs/algebra',
   'OffchainLabs/stylus-sdk-rs',
-  'evmts/tevm-monorepo',
-  'powdr-labs/powdr',
-  'aestus-relay/mev-boost-relay',
-  'dl-solarity/solidity-lib',
   'axiom-crypto/snark-verifier',
-  'holiman/goevmlab',
 ])
 
 // Get all projects as an array of repo names
